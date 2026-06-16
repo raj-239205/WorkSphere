@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Add Employee - WorkSphere{% endblock %}
+{% block page_title %}Add New Employee{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 800px; margin: 0 auto;">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-person-plus-fill"></i> Employee Details</h3>
+        <a href="{{ url_for('employee.list_employees') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to List
+        </a>
+    </div>
+    
+    <form action="{{ url_for('employee.add_employee') }}" method="POST">
+        <div class="form-grid">
+            <!-- Full Name -->
+            <div class="form-group">
+                <label for="name" class="form-label">Full Name *</label>
+                <input type="text" id="name" name="name" class="form-control" placeholder="Rajveer Choudhary" value="{{ form.get('name', '') }}" required>
+            </div>
+            
+            <!-- Email -->
+            <div class="form-group">
+                <label for="email" class="form-label">Email Address *</label>
+                <input type="email" id="email" name="email" class="form-control" placeholder="john@example.com" value="{{ form.get('email', '') }}" required>
+            </div>
+            
+            <!-- Phone -->
+            <div class="form-group">
+                <label for="phone" class="form-label">Phone Number</label>
+                <input type="text" id="phone" name="phone" class="form-control" placeholder="1234567890" value="{{ form.get('phone', '') }}">
+            </div>
+            
+            <!-- Department -->
+            <div class="form-group">
+                <label for="department_id" class="form-label">Department *</label>
+                <select id="department_id" name="department_id" class="form-control" required>
+                    <option value="">Select Department</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.department_id }}" {{ 'selected' if form.get('department_id')|int == dept.department_id }}>
+                        {{ dept.department_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Designation -->
+            <div class="form-group">
+                <label for="designation" class="form-label">Designation</label>
+                <input type="text" id="designation" name="designation" class="form-control" placeholder="Software Engineer" value="{{ form.get('designation', '') }}">
+            </div>
+            
+            <!-- Salary -->
+            <div class="form-group">
+                <label for="salary" class="form-label">Base Salary ($) *</label>
+                <input type="number" step="0.01" id="salary" name="salary" class="form-control" placeholder="50000.00" value="{{ form.get('salary', '0.00') }}" required>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <button type="reset" class="btn btn-secondary">Reset</button>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-lg"></i> Save Employee
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

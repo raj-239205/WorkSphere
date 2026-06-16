@@ -1,0 +1,431 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - WorkSphere{% endblock %}
+{% block page_title %}Dashboard Overview{% endblock %}
+
+{% block head %}
+<!-- Chart.js CDN for visual analytics -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+{% if session.get('role') in ['Admin', 'HR'] %}
+    <!-- Admin & HR Company-wide dashboard -->
+    
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+        <!-- Total Employees -->
+        <div class="glass-card metric-card metric-employees">
+            <div class="metric-icon">
+                <i class="bi bi-people"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ stats.TotalEmployees }}</span>
+                <span class="metric-label">Total Staff</span>
+            </div>
+        </div>
+        
+        <!-- Today Present -->
+        <div class="glass-card metric-card metric-present">
+            <div class="metric-icon">
+                <i class="bi bi-person-check"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ stats.Present }}</span>
+                <span class="metric-label">Present Today</span>
+            </div>
+        </div>
+        
+        <!-- Today Absent/Unmarked -->
+        <div class="glass-card metric-card metric-absent">
+            <div class="metric-icon">
+                <i class="bi bi-person-x"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ stats.Absent + stats.Unmarked }}</span>
+                <span class="metric-label">Absent / Unmarked</span>
+            </div>
+        </div>
+        
+        <!-- Pending Leaves -->
+        <div class="glass-card metric-card metric-leaves">
+            <div class="metric-icon">
+                <i class="bi bi-envelope-open"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ pending_leaves }}</span>
+                <span class="metric-label">Pending Leaves</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Analytics Grid -->
+    <div class="analytics-grid">
+        <!-- Attendance Gauge Chart -->
+        <div class="glass-card">
+            <div class="card-header-custom">
+                <h3 class="card-title-custom"><i class="bi bi-pie-chart"></i> Attendance Rate Today</h3>
+            </div>
+            <div style="height: 220px; display: flex; align-items: center; justify-content: center;">
+                <canvas id="attendanceRateChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Department Headcount -->
+        <div class="glass-card">
+            <div class="card-header-custom">
+                <h3 class="card-title-custom"><i class="bi bi-bar-chart-steps"></i> Headcount by Department</h3>
+            </div>
+            <div style="height: 220px; position: relative;">
+                <canvas id="deptHeadcountChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- Leave Requests Distribution -->
+        <div class="glass-card">
+            <div class="card-header-custom">
+                <h3 class="card-title-custom"><i class="bi bi-activity"></i> Leave Requests Distribution</h3>
+            </div>
+            <div style="height: 220px; display: flex; align-items: center; justify-content: center;">
+                <canvas id="leaveDistributionChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columns Section -->
+    <div class="dashboard-columns">
+        <!-- Left: Recent Leave Requests -->
+        <div class="glass-card">
+            <div class="card-header-custom">
+                <h3 class="card-title-custom"><i class="bi bi-calendar2-week"></i> Recent Leave Requests</h3>
+                <a href="{{ url_for('leave.list_leaves') }}" class="btn-secondary btn" style="padding: 6px 12px; font-size: 0.8rem;">View All</a>
+            </div>
+            <div class="table-container">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Employee</th>
+                            <th>Dates</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for leave in recent_leaves %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ leave.employee_name }}</td>
+                            <td>{{ leave.start_date }} to {{ leave.end_date }}</td>
+                            <td>
+                                <span class="badge badge-{{ leave.status|lower }}">{{ leave.status }}</span>
+                            </td>
+                            <td>
+                                {% if leave.status == 'Pending' %}
+                                <div style="display: flex; gap: 8px;">
+                                    <form action="{{ url_for('leave.approve_leave', leave_id=leave.leave_id) }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Approve</button>
+                                    </form>
+                                    <form action="{{ url_for('leave.reject_leave', leave_id=leave.leave_id) }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">Reject</button>
+                                    </form>
+                                </div>
+                                {% else %}
+                                <span style="font-size: 0.8rem; color: var(--text-dark);">Resolved</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="4" style="text-align: center; color: var(--text-muted);">No recent leave requests.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Right: Recent Attendance & Quick Actions -->
+        <div style="display: flex; flex-direction: column; gap: 32px;">
+            <!-- Quick Actions -->
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h3 class="card-title-custom"><i class="bi bi-lightning-charge"></i> Quick Actions</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <a href="{{ url_for('employee.add_employee') }}" class="btn btn-primary" style="justify-content: flex-start; text-align: left;">
+                        <i class="bi bi-person-plus"></i> Add Employee
+                    </a>
+                    <a href="{{ url_for('attendance.mark_attendance') }}" class="btn btn-secondary" style="justify-content: flex-start; text-align: left;">
+                        <i class="bi bi-check2-circle"></i> Mark Daily Attendance
+                    </a>
+                    <a href="{{ url_for('department.add_department') }}" class="btn btn-secondary" style="justify-content: flex-start; text-align: left;">
+                        <i class="bi bi-plus-square"></i> Add Department
+                    </a>
+                    <a href="{{ url_for('reports.index') }}" class="btn btn-secondary" style="justify-content: flex-start; text-align: left;">
+                        <i class="bi bi-file-earmark-bar-graph"></i> View Analytics & Reports
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Recent Attendance -->
+            <div class="glass-card" style="flex-grow: 1;">
+                <div class="card-header-custom">
+                    <h3 class="card-title-custom"><i class="bi bi-clock-history"></i> Recent Activity</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    {% for item in recent_attendance %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">{{ item.employee_name }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">{{ item.date }}</div>
+                        </div>
+                        <span class="badge badge-{{ item.status|lower }}">{{ item.status }}</span>
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: var(--text-muted); padding: 12px 0;">No recent activity.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+{% elif session.get('role') == 'Employee' %}
+    <!-- Employee Portal View -->
+    
+    <!-- Welcome card -->
+    <div class="glass-card" style="margin-bottom: 32px; display: flex; align-items: center; gap: 24px; background: linear-gradient(135deg, rgba(15, 23, 42, 0.75) 0%, rgba(56, 189, 248, 0.05) 100%);">
+        <div class="profile-avatar">
+            {{ employee.name[0]|upper if employee else 'U' }}
+        </div>
+        <div>
+            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.6rem; font-weight: 700; margin-bottom: 4px;">Welcome back, {{ employee.name if employee else session.get('username') }}!</h2>
+            <p style="color: var(--text-muted); font-size: 0.95rem;">
+                {{ employee.designation if employee else 'Guest' }} &bull; {{ employee.department_name if employee else 'No Department' }}
+            </p>
+        </div>
+    </div>
+    
+    <!-- Personal Metrics -->
+    <div class="metrics-grid">
+        <!-- Attendance rate -->
+        <div class="glass-card metric-card metric-present">
+            <div class="metric-icon">
+                <i class="bi bi-calendar-check"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ attendance_rate }}%</span>
+                <span class="metric-label">My Attendance Rate</span>
+            </div>
+        </div>
+        
+        <!-- Total leaves -->
+        <div class="glass-card metric-card metric-leaves">
+            <div class="metric-icon">
+                <i class="bi bi-airplane"></i>
+            </div>
+            <div class="metric-details">
+                <span class="metric-value">{{ recent_leaves|length }}</span>
+                <span class="metric-label">My Leave Requests</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="dashboard-columns">
+        <!-- Profile info -->
+        <div class="glass-card">
+            <div class="card-header-custom">
+                <h3 class="card-title-custom"><i class="bi bi-person-lines-fill"></i> My Profile Info</h3>
+            </div>
+            {% if employee %}
+            <div class="profile-grid">
+                <div class="info-item">
+                    <span class="info-label">Full Name</span>
+                    <span class="info-value">{{ employee.name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Email Address</span>
+                    <span class="info-value">{{ employee.email }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Phone Number</span>
+                    <span class="info-value">{{ employee.phone or 'N/A' }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Designation</span>
+                    <span class="info-value">{{ employee.designation }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Department</span>
+                    <span class="info-value">{{ employee.department_name }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Salary Details</span>
+                    <span class="info-value" style="font-family: monospace; font-weight: bold;">${{ employee.salary }}</span>
+                </div>
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted);">No profile details linked to your account.</p>
+            {% endif %}
+        </div>
+        
+        <!-- Quick Actions & Leaves -->
+        <div style="display: flex; flex-direction: column; gap: 32px;">
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h3 class="card-title-custom"><i class="bi bi-lightning-charge"></i> Quick Actions</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <a href="{{ url_for('leave.apply_leave') }}" class="btn btn-primary" style="justify-content: flex-start;">
+                        <i class="bi bi-calendar-plus"></i> Apply for Leave
+                    </a>
+                    <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-secondary" style="justify-content: flex-start;">
+                        <i class="bi bi-calendar3"></i> View Attendance Logs
+                    </a>
+                </div>
+            </div>
+            
+            <div class="glass-card">
+                <div class="card-header-custom">
+                    <h3 class="card-title-custom"><i class="bi bi-airplane-engines"></i> Recent Leaves</h3>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 16px;">
+                    {% for leave in recent_leaves %}
+                    <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--card-border); padding-bottom: 12px;">
+                        <div>
+                            <div style="font-weight: 600; font-size: 0.9rem;">{{ leave.start_date }} to {{ leave.end_date }}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; overflow: hidden; max-width: 180px;" title="{{ leave.reason }}">
+                                {{ leave.reason }}
+                            </div>
+                        </div>
+                        <span class="badge badge-{{ leave.status|lower }}">{{ leave.status }}</span>
+                    </div>
+                    {% else %}
+                    <div style="text-align: center; color: var(--text-muted); padding: 12px 0;">No leaves requested.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if session.get('role') in ['Admin', 'HR'] %}
+<script>
+    // Attendance Rate Chart (Doughnut)
+    const ctxAttendance = document.getElementById('attendanceRateChart').getContext('2d');
+    const attendanceRate = {{ stats.AttendanceRate }};
+    const attendanceChart = new Chart(ctxAttendance, {
+        type: 'doughnut',
+        data: {
+            labels: ['Present %', 'Absent %'],
+            datasets: [{
+                data: [attendanceRate, 100 - attendanceRate],
+                backgroundColor: ['#10b981', 'rgba(239, 68, 68, 0.1)'],
+                borderColor: ['#10b981', '#ef4444'],
+                borderWidth: 1,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                legend: { display: false },
+                tooltip: { enabled: true }
+            }
+        }
+    });
+    
+    // Add text center to doughnut
+    Chart.register({
+        id: 'centerText',
+        beforeDraw: function(chart) {
+            if (chart.config.type === 'doughnut' && chart.canvas.id === 'attendanceRateChart') {
+                var width = chart.width,
+                    height = chart.height,
+                    ctx = chart.ctx;
+                ctx.restore();
+                var fontSize = (height / 120).toFixed(2);
+                ctx.font = fontSize + "em 'Outfit', sans-serif";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = "#f8fafc";
+                var text = attendanceRate + "%",
+                    textX = Math.round((width - ctx.measureText(text).width) / 2),
+                    textY = height / 2;
+                ctx.fillText(text, textX, textY);
+                ctx.save();
+            }
+        }
+    });
+
+    // Department Headcount (Horizontal Bar)
+    const ctxDept = document.getElementById('deptHeadcountChart').getContext('2d');
+    const deptLabels = {{ dept_labels|tojson }};
+    const deptCounts = {{ dept_counts|tojson }};
+    
+    new Chart(ctxDept, {
+        type: 'bar',
+        data: {
+            labels: deptLabels,
+            datasets: [{
+                label: 'Employees count',
+                data: deptCounts,
+                backgroundColor: 'rgba(56, 189, 248, 0.3)',
+                borderColor: '#38bdf8',
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', stepSize: 1 }
+                },
+                y: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8' }
+                }
+            }
+        }
+    });
+
+    // Leave Request Status (Pie Chart)
+    const ctxLeave = document.getElementById('leaveDistributionChart').getContext('2d');
+    const leaveStats = {{ leave_stats|tojson }};
+    new Chart(ctxLeave, {
+        type: 'pie',
+        data: {
+            labels: ['Approved', 'Pending', 'Rejected'],
+            datasets: [{
+                data: [leaveStats.Approved, leaveStats.Pending, leaveStats.Rejected],
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.3)',
+                    'rgba(245, 158, 11, 0.3)',
+                    'rgba(239, 68, 68, 0.3)'
+                ],
+                borderColor: ['#10b981', '#f59e0b', '#ef4444'],
+                borderWidth: 1.5
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                }
+            }
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

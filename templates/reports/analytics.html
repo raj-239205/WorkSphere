@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports & Analytics - WorkSphere{% endblock %}
+{% block page_title %}Reports & Visual Analytics{% endblock %}
+
+{% block head %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <p style="color: var(--text-muted);">Company-wide metrics, salary details, and historical workforce activity trends.</p>
+    <div style="display: flex; gap: 12px;">
+        <a href="{{ url_for('reports.attendance_report') }}" class="btn btn-secondary">
+            <i class="bi bi-calendar-range"></i> Detailed Attendance Report
+        </a>
+        <button onclick="window.print()" class="btn btn-primary">
+            <i class="bi bi-printer"></i> Print Report / Export PDF
+        </button>
+    </div>
+</div>
+
+<div class="analytics-grid" style="grid-template-columns: 2fr 1fr; margin-bottom: 32px;">
+    <!-- Historical Attendance Trends (Line chart) -->
+    <div class="glass-card">
+        <div class="card-header-custom">
+            <h3 class="card-title-custom"><i class="bi bi-graph-up-arrow"></i> Monthly Attendance Rate (%)</h3>
+        </div>
+        <div style="height: 280px; position: relative;">
+            <canvas id="monthlyAttendanceChart"></canvas>
+        </div>
+    </div>
+    
+    <!-- Leaves Summary (Pie chart) -->
+    <div class="glass-card">
+        <div class="card-header-custom">
+            <h3 class="card-title-custom"><i class="bi bi-pie-chart-fill"></i> Leave Requests Distribution</h3>
+        </div>
+        <div style="height: 280px; display: flex; align-items: center; justify-content: center;">
+            <canvas id="leaveStatusPieChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Department Headcount & Salaries Summary -->
+<div class="glass-card">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-cash-stack"></i> Department Payroll & Member Summary</h3>
+    </div>
+    <div class="table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Department</th>
+                    <th>Headcount</th>
+                    <th>Average Annual Salary</th>
+                    <th>Estimated Monthly Payroll</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept in dept_rows %}
+                <tr>
+                    <td style="font-weight: 600; font-size: 1.05rem;">{{ dept.department_name }}</td>
+                    <td>
+                        <span class="badge" style="background-color: var(--primary-glow); color: var(--primary); font-weight: bold; padding: 6px 12px;">
+                            {{ dept.headcount }} Employees
+                        </span>
+                    </td>
+                    <td style="font-family: monospace; font-weight: 600; color: var(--success); font-size: 0.95rem;">
+                        ${{ "{:,.2f}".format(dept.avg_salary) }}
+                    </td>
+                    <td style="font-family: monospace; font-weight: 600; font-size: 0.95rem;">
+                        ${{ "{:,.2f}".format((dept.avg_salary * dept.headcount) / 12) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 24px;">No department metrics available.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Monthly Attendance Line Chart
+    const ctxTrend = document.getElementById('monthlyAttendanceChart').getContext('2d');
+    const monthsLabels = {{ months_labels|tojson }};
+    const attendanceRates = {{ attendance_rates|tojson }};
+    
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: monthsLabels.length > 0 ? monthsLabels : ['No Data'],
+            datasets: [{
+                label: 'Attendance Rate',
+                data: attendanceRates.length > 0 ? attendanceRates : [0],
+                borderColor: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.05)',
+                borderWidth: 3,
+                tension: 0.35,
+                fill: true,
+                pointBackgroundColor: '#818cf8',
+                pointBorderColor: '#080c14',
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) { return 'Rate: ' + context.raw + '%'; }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } },
+                    min: 0,
+                    max: 100
+                }
+            }
+        }
+    });
+
+    // Leave Status Pie Chart
+    const ctxPie = document.getElementById('leaveStatusPieChart').getContext('2d');
+    const leaveStats = {{ leave_summary|tojson }};
+    new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: ['Approved', 'Pending', 'Rejected'],
+            datasets: [{
+                data: [leaveStats.Approved, leaveStats.Pending, leaveStats.Rejected],
+                backgroundColor: [
+                    'rgba(16, 185, 129, 0.3)',
+                    'rgba(245, 158, 11, 0.3)',
+                    'rgba(239, 68, 68, 0.3)'
+                ],
+                borderColor: ['#10b981', '#f59e0b', '#ef4444'],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '60%',
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans', size: 11 } }
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}

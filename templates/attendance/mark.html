@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Mark Attendance - WorkSphere{% endblock %}
+{% block page_title %}Mark Daily Attendance{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 900px; margin: 0 auto;">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-calendar-plus-fill"></i> Log Team Attendance</h3>
+        <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> View Log Records
+        </a>
+    </div>
+    
+    <form action="{{ url_for('attendance.mark_attendance', date=date_str) }}" method="POST">
+        <!-- Date Selector Row -->
+        <div class="form-group" style="max-width: 300px; margin-bottom: 24px;">
+            <label for="date-select" class="form-label font-weight-bold">Select Log Date:</label>
+            <input type="date" id="date-select" name="date" class="form-control" value="{{ date_str }}" onchange="window.location.href='?date=' + this.value">
+        </div>
+        
+        <!-- Employees Attendance Table -->
+        <div class="table-container" style="margin-bottom: 24px;">
+            <table class="custom-table">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Department & Designation</th>
+                        <th style="text-align: center; width: 320px;">Status selection</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for emp in employees %}
+                    {% set current_status = existing_map.get(emp.emp_id) %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ emp.name }}</td>
+                        <td>
+                            <span style="font-size: 0.85rem; color: var(--text-muted);">
+                                {{ emp.department_name or 'Unassigned' }} &bull; {{ emp.designation or 'Staff' }}
+                            </span>
+                        </td>
+                        <td>
+                            <div style="display: flex; gap: 20px; justify-content: center;">
+                                <!-- Present Option -->
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="status_{{ emp.emp_id }}" value="Present" 
+                                           {{ 'checked' if current_status == 'Present' or not current_status }} 
+                                           style="accent-color: var(--success); cursor: pointer;">
+                                    <span style="color: var(--success); font-weight: 600; font-size: 0.85rem;">Present</span>
+                                </label>
+                                
+                                <!-- Absent Option -->
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="status_{{ emp.emp_id }}" value="Absent" 
+                                           {{ 'checked' if current_status == 'Absent' }} 
+                                           style="accent-color: var(--danger); cursor: pointer;">
+                                    <span style="color: var(--danger); font-weight: 600; font-size: 0.85rem;">Absent</span>
+                                </label>
+                                
+                                <!-- Leave Option -->
+                                <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <input type="radio" name="status_{{ emp.emp_id }}" value="Leave" 
+                                           {{ 'checked' if current_status == 'Leave' }} 
+                                           style="accent-color: var(--warning); cursor: pointer;">
+                                    <span style="color: var(--warning); font-weight: 600; font-size: 0.85rem;">Leave</span>
+                                </label>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                            No active employees found to log attendance.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save2"></i> Save Daily Attendance
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

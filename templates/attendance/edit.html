@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Attendance - WorkSphere{% endblock %}
+{% block page_title %}Modify Attendance Record{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 500px; margin: 0 auto;">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-calendar-event"></i> Edit Attendance Log</h3>
+        <a href="{{ url_for('attendance.list_attendance', date=record.date) }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Cancel
+        </a>
+    </div>
+    
+    <div style="background-color: rgba(255, 255, 255, 0.02); border-radius: var(--radius-md); padding: 16px; margin-bottom: 24px; border: 1px solid var(--card-border);">
+        <div style="margin-bottom: 8px;"><strong>Employee:</strong> {{ record.employee_name }}</div>
+        <div><strong>Date:</strong> {{ record.date }}</div>
+    </div>
+    
+    <form action="{{ url_for('attendance.edit_attendance', attendance_id=record.attendance_id) }}" method="POST">
+        <div class="form-group" style="margin-bottom: 32px;">
+            <label for="status" class="form-label">Attendance Status *</label>
+            <select id="status" name="status" class="form-control" required>
+                <option value="Present" {{ 'selected' if record.status == 'Present' }}>Present</option>
+                <option value="Absent" {{ 'selected' if record.status == 'Absent' }}>Absent</option>
+                <option value="Leave" {{ 'selected' if record.status == 'Leave' }}>Leave</option>
+            </select>
+        </div>
+        
+        <div class="form-actions" style="margin-top: 0; padding-top: 20px;">
+            <a href="{{ url_for('attendance.list_attendance', date=record.date) }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle"></i> Save Update
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

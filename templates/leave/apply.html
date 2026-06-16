@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block title %}Apply Leave - WorkSphere{% endblock %}
+{% block page_title %}Apply for Leave{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 600px; margin: 0 auto;">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-calendar-plus-fill"></i> New Leave Request</h3>
+        <a href="{{ url_for('leave.list_leaves') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Registry
+        </a>
+    </div>
+    
+    <form action="{{ url_for('leave.apply_leave') }}" method="POST">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
+            <!-- Employee selection (Admin/HR only) -->
+            {% if session.get('role') in ['Admin', 'HR'] %}
+            <div class="form-group">
+                <label for="emp_id" class="form-label">Select Employee *</label>
+                <select id="emp_id" name="emp_id" class="form-control" required>
+                    <option value="">Select Employee</option>
+                    {% for emp in employees %}
+                    <option value="{{ emp.emp_id }}" {{ 'selected' if form.get('emp_id')|int == emp.emp_id }}>
+                        {{ emp.name }} ({{ emp.department_name or 'Unassigned' }})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <!-- Dates Row -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label for="start_date" class="form-label">Start Date *</label>
+                    <input type="date" id="start_date" name="start_date" class="form-control" value="{{ form.get('start_date', '') }}" min="{{ today_str }}" required>
+                </div>
+                <div class="form-group">
+                    <label for="end_date" class="form-label">End Date *</label>
+                    <input type="date" id="end_date" name="end_date" class="form-control" value="{{ form.get('end_date', '') }}" min="{{ today_str }}" required>
+                </div>
+            </div>
+            
+            <!-- Reason / Notes -->
+            <div class="form-group">
+                <label for="reason" class="form-label">Reason for Leave *</label>
+                <textarea id="reason" name="reason" class="form-control" rows="4" placeholder="Brief explanation for the leave request..." required>{{ form.get('reason', '') }}</textarea>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{{ url_for('leave.list_leaves') }}" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-send-check"></i> Submit Leave Request
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const startDateVal = document.getElementById('start_date').value;
+        const endDateVal = document.getElementById('end_date').value;
+        
+        if (!startDateVal || !endDateVal) return;
+        
+        const startDate = new Date(startDateVal);
+        const endDate = new Date(endDateVal);
+        
+        // Normalize dates for safe day boundary comparisons
+        startDate.setHours(0, 0, 0, 0);
+        endDate.setHours(0, 0, 0, 0);
+        
+        // Get today's local date at midnight
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // 1. Start date cannot be in the past
+        if (startDate < today) {
+            alert("Error: Start date cannot be in the past.");
+            e.preventDefault();
+            return;
+        }
+        
+        // 2. End date cannot be earlier than start date
+        if (endDate < startDate) {
+            alert("Error: End date cannot be earlier than start date.");
+            e.preventDefault();
+            return;
+        }
+        
+        // 3. Limit realistic years
+        const currentYear = today.getFullYear();
+        const maxYear = currentYear + 2;
+        
+        if (startDate.getFullYear() < currentYear || startDate.getFullYear() > maxYear) {
+            alert(`Error: Start date year must be between ${currentYear} and ${maxYear}.`);
+            e.preventDefault();
+            return;
+        }
+        
+        if (endDate.getFullYear() < currentYear || endDate.getFullYear() > maxYear) {
+            alert(`Error: End date year must be between ${currentYear} and ${maxYear}.`);
+            e.preventDefault();
+            return;
+        }
+    });
+</script>
+{% endblock %}

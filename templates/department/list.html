@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Departments - WorkSphere{% endblock %}
+{% block page_title %}Department Management{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-building-fill"></i> Department Directory</h3>
+        <a href="{{ url_for('department.add_department') }}" class="btn btn-primary">
+            <i class="bi bi-plus-square"></i> Add Department
+        </a>
+    </div>
+    
+    <!-- Table View -->
+    <div class="table-container" style="margin-top: 16px;">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Department Name</th>
+                    <th>Manager Name</th>
+                    <th>Employee Headcount</th>
+                    <th style="text-align: right; width: 160px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept in departments %}
+                <tr>
+                    <td style="font-weight: 600; font-size: 1rem;">{{ dept.department_name }}</td>
+                    <td>{{ dept.manager_name or 'Not Assigned' }}</td>
+                    <td>
+                        <span class="badge" style="background-color: var(--primary-glow); color: var(--primary); font-size: 0.85rem; font-weight: bold; padding: 6px 12px;">
+                            {{ dept.employee_count }} Members
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                            <a href="{{ url_for('department.edit_department', department_id=dept.department_id) }}" class="btn-icon-only" title="Edit Department">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{{ url_for('department.delete_department', department_id=dept.department_id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete department \'{{ dept.department_name }}\'?');">
+                                <button type="submit" class="btn-icon-only btn-icon-delete" title="Delete Department">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                        No departments found. Create one to get started.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

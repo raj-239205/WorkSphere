@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block title %}Employee Profile - WorkSphere{% endblock %}
+{% block page_title %}Employee Profile{% endblock %}
+
+{% block content %}
+<div class="glass-card" style="max-width: 800px; margin: 0 auto;">
+    <!-- Profile Header -->
+    <div class="profile-header">
+        <div class="profile-avatar">
+            {{ employee.name[0]|upper }}
+        </div>
+        <div class="profile-title">
+            <h1>{{ employee.name }}</h1>
+            <p>{{ employee.designation or 'No Designation' }} &bull; {{ employee.department_name or 'Unassigned Department' }}</p>
+        </div>
+    </div>
+    
+    <!-- Profile Grid details -->
+    <div class="profile-grid" style="margin-bottom: 32px;">
+        <div class="info-item">
+            <span class="info-label">Full Name</span>
+            <span class="info-value">{{ employee.name }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Email Address</span>
+            <span class="info-value">{{ employee.email }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Phone Number</span>
+            <span class="info-value">{{ employee.phone or 'N/A' }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Department</span>
+            <span class="info-value">{{ employee.department_name or 'Unassigned' }}</span>
+        </div>
+        
+        <div class="info-item">
+            <span class="info-label">Designation</span>
+            <span class="info-value">{{ employee.designation or 'N/A' }}</span>
+        </div>
+        
+        {% if session.get('role') in ['Admin', 'HR'] %}
+        <div class="info-item">
+            <span class="info-label">Annual Base Salary</span>
+            <span class="info-value" style="font-family: monospace; font-weight: bold; color: var(--success);">${{ employee.salary }}</span>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="form-actions" style="justify-content: flex-start;">
+        {% if session.get('role') in ['Admin', 'HR'] %}
+            <a href="{{ url_for('employee.edit_employee', emp_id=employee.emp_id) }}" class="btn btn-primary">
+                <i class="bi bi-pencil"></i> Edit Details
+            </a>
+            <a href="{{ url_for('employee.list_employees') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Directory
+            </a>
+        {% else %}
+            <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

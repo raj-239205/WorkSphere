@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block title %}Attendance Report - WorkSphere{% endblock %}
+{% block page_title %}Detailed Attendance Report{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-calendar-range-fill"></i> Attendance Analysis</h3>
+        <div style="display: flex; gap: 12px;">
+            <button onclick="window.print()" class="btn btn-secondary" style="padding: 8px 16px;">
+                <i class="bi bi-printer"></i> Print Report
+            </button>
+            <a href="{{ url_for('reports.index') }}" class="btn btn-primary" style="padding: 8px 16px;">
+                Back to Analytics
+            </a>
+        </div>
+    </div>
+    
+    <!-- Filter Parameters -->
+    <div class="filter-bar">
+        <form action="{{ url_for('reports.attendance_report') }}" method="GET" class="search-form" style="max-width: 100%; width: 100%; justify-content: flex-start; align-items: flex-end;">
+            <div class="form-group" style="width: 180px;">
+                <label for="start_date" class="form-label">Start Date</label>
+                <input type="date" id="start_date" name="start_date" class="form-control" value="{{ start_date }}">
+            </div>
+            
+            <div class="form-group" style="width: 180px;">
+                <label for="end_date" class="form-label">End Date</label>
+                <input type="date" id="end_date" name="end_date" class="form-control" value="{{ end_date }}">
+            </div>
+            
+            <div class="form-group" style="width: 200px;">
+                <label for="department_id" class="form-label">Department</label>
+                <select id="department_id" name="department_id" class="form-control">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.department_id }}" {{ 'selected' if selected_dept == dept.department_id }}>
+                        {{ dept.department_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-secondary" style="height: 48px;">
+                <i class="bi bi-filter-square"></i> Apply Filters
+            </button>
+        </form>
+    </div>
+    
+    <!-- Report Details Table -->
+    <div class="table-container" style="margin-top: 16px;">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Employee Name</th>
+                    <th>Department</th>
+                    <th>Designation</th>
+                    <th style="text-align: center;">Present Days</th>
+                    <th style="text-align: center;">Absent Days</th>
+                    <th style="text-align: center;">Approved Leave Days</th>
+                    <th style="text-align: center;">Total Logged</th>
+                    <th style="text-align: right; width: 160px;">Attendance Rate</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td style="font-weight: 600; font-size: 0.95rem;">{{ row.name }}</td>
+                    <td>
+                        <span class="badge" style="background-color: var(--bg-tertiary); color: var(--text-main);">
+                            {{ row.department_name }}
+                        </span>
+                    </td>
+                    <td>{{ row.designation or 'N/A' }}</td>
+                    <td style="text-align: center; color: var(--success); font-weight: bold;">{{ row.present_days }}</td>
+                    <td style="text-align: center; color: var(--danger); font-weight: bold;">{{ row.absent_days }}</td>
+                    <td style="text-align: center; color: var(--warning); font-weight: bold;">{{ row.leave_days }}</td>
+                    <td style="text-align: center; font-weight: 500;">{{ row.total_days }}</td>
+                    <td style="text-align: right; font-weight: bold; font-family: monospace; font-size: 1.05rem; color: {{ 'var(--success)' if row.attendance_rate >= 90 else 'var(--warning)' if row.attendance_rate >= 75 else 'var(--danger)' }}">
+                        {{ row.attendance_rate }}%
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                        No employees found matching the filters.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

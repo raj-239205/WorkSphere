@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+
+{% block title %}Leave Requests - WorkSphere{% endblock %}
+{% block page_title %}Leave Management{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom"><i class="bi bi-airplane-fill"></i> Leave Registry</h3>
+        {% if session.get('role') == 'Employee' %}
+        <a href="{{ url_for('leave.apply_leave') }}" class="btn btn-primary">
+            <i class="bi bi-calendar-plus"></i> Apply for Leave
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Filter tabs -->
+    <div class="filter-bar">
+        <div class="filters-group" style="gap: 8px;">
+            <a href="{{ url_for('leave.list_leaves') }}" class="btn {{ 'btn-primary' if not selected_status else 'btn-secondary' }}" style="padding: 8px 16px; font-size: 0.85rem;">
+                All Requests
+            </a>
+            <a href="{{ url_for('leave.list_leaves', status='Pending') }}" class="btn {{ 'btn-primary' if selected_status == 'Pending' else 'btn-secondary' }}" style="padding: 8px 16px; font-size: 0.85rem;">
+                Pending
+            </a>
+            <a href="{{ url_for('leave.list_leaves', status='Approved') }}" class="btn {{ 'btn-primary' if selected_status == 'Approved' else 'btn-secondary' }}" style="padding: 8px 16px; font-size: 0.85rem;">
+                Approved
+            </a>
+            <a href="{{ url_for('leave.list_leaves', status='Rejected') }}" class="btn {{ 'btn-primary' if selected_status == 'Rejected' else 'btn-secondary' }}" style="padding: 8px 16px; font-size: 0.85rem;">
+                Rejected
+            </a>
+        </div>
+    </div>
+    
+    <!-- Table View -->
+    <div class="table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <th>Employee</th>
+                    <th>Department</th>
+                    {% endif %}
+                    <th>Reason / Notes</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <th style="text-align: right; width: 200px;">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for req in requests %}
+                <tr>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <td style="font-weight: 600;">{{ req.employee_name }}</td>
+                    <td>{{ req.department_name or 'Unassigned' }}</td>
+                    {% endif %}
+                    <td style="max-width: 250px; text-overflow: ellipsis; overflow: hidden;" title="{{ req.reason }}">
+                        {{ req.reason or 'No reason provided.' }}
+                    </td>
+                    <td>{{ req.start_date }}</td>
+                    <td>{{ req.end_date }}</td>
+                    <td>
+                        <span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span>
+                    </td>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <td>
+                        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+                            {% if req.status == 'Pending' %}
+                            <form action="{{ url_for('leave.approve_leave', leave_id=req.leave_id) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">
+                                    Approve
+                                </button>
+                            </form>
+                            <form action="{{ url_for('leave.reject_leave', leave_id=req.leave_id) }}" method="POST" style="display: inline;">
+                                <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 0.75rem;">
+                                    Reject
+                                </button>
+                            </form>
+                            {% endif %}
+                            
+                            <form action="{{ url_for('leave.delete_leave', leave_id=req.leave_id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this leave record?');">
+                                <button type="submit" class="btn-icon-only btn-icon-delete" title="Delete Leave Request">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ 7 if session.get('role') in ['Admin', 'HR'] else 4 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                        No leave requests found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

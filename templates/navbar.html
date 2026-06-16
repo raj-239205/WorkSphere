@@ -1,0 +1,84 @@
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <a href="{{ url_for('dashboard.index') }}">
+            <i class="bi bi-globe2"></i> WorkSphere
+        </a>
+    </div>
+    
+    <ul class="sidebar-menu">
+        <!-- Dashboard (Shared) -->
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'dashboard' or request.path == '/' }}">
+            <a href="{{ url_for('dashboard.index') }}">
+                <i class="bi bi-grid-1x2-fill"></i> Dashboard
+            </a>
+        </li>
+        
+        {% if session.get('role') in ['Admin', 'HR'] %}
+            <!-- Employee Management -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' }}">
+                <a href="{{ url_for('employee.list_employees') }}">
+                    <i class="bi bi-people-fill"></i> Employees
+                </a>
+            </li>
+            
+            <!-- Department Management -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'department' }}">
+                <a href="{{ url_for('department.list_departments') }}">
+                    <i class="bi bi-building-fill"></i> Departments
+                </a>
+            </li>
+            
+            <!-- Attendance Logs & Marking -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'attendance' }}">
+                <a href="{{ url_for('attendance.list_attendance') }}">
+                    <i class="bi bi-calendar-check-fill"></i> Attendance
+                </a>
+            </li>
+            
+            <!-- Leave Requests Approval -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'leave' }}">
+                <a href="{{ url_for('leave.list_leaves') }}">
+                    <i class="bi bi-file-earmark-text-fill"></i> Leave Requests
+                </a>
+            </li>
+            
+            <!-- Reports & Analytics -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'reports' }}">
+                <a href="{{ url_for('reports.index') }}">
+                    <i class="bi bi-bar-chart-line-fill"></i> Reports & Stats
+                </a>
+            </li>
+            
+        {% elif session.get('role') == 'Employee' %}
+            <!-- Employee Self-Service Options -->
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' }}">
+                <a href="{{ url_for('employee.profile') }}">
+                    <i class="bi bi-person-badge-fill"></i> My Profile
+                </a>
+            </li>
+            
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'attendance' }}">
+                <a href="{{ url_for('attendance.list_attendance') }}">
+                    <i class="bi bi-calendar-check-fill"></i> My Attendance
+                </a>
+            </li>
+            
+            <li class="sidebar-item {{ 'active' if request.blueprint == 'leave' }}">
+                <a href="{{ url_for('leave.list_leaves') }}">
+                    <i class="bi bi-calendar2-plus-fill"></i> Apply Leave
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+    
+    <!-- User status footer -->
+    <div class="sidebar-user">
+        <div class="user-info">
+            <span class="user-name">{{ session.get('username', 'Guest') }}</span>
+            <span class="user-role">{{ 'System Administrator' if session.get('role') == 'Admin' else 'HR Manager' if session.get('role') == 'HR' else 'Employee' if session.get('role') == 'Employee' else session.get('role', 'Viewer') }}</span>
+        </div>
+        <a href="{{ url_for('auth.logout') }}" class="logout-btn" title="Log Out">
+            <i class="bi bi-box-arrow-right"></i>
+        </a>
+    </div>
+</aside>

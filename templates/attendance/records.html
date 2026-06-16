@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+
+{% block title %}Attendance Records - WorkSphere{% endblock %}
+{% block page_title %}Attendance Logs{% endblock %}
+
+{% block content %}
+<div class="glass-card">
+    <div class="card-header-custom">
+        <h3 class="card-title-custom">
+            <i class="bi bi-calendar-check-fill"></i> 
+            {{ 'Company Attendance Records' if session.get('role') in ['Admin', 'HR'] else 'My Attendance Log' }}
+        </h3>
+        {% if session.get('role') in ['Admin', 'HR'] %}
+        <a href="{{ url_for('attendance.mark_attendance') }}" class="btn btn-primary">
+            <i class="bi bi-check2-circle"></i> Mark Daily Attendance
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Filter Bar -->
+    <div class="filter-bar">
+        <form action="{{ url_for('attendance.list_attendance') }}" method="GET" class="search-form" style="max-width: 100%; width: 100%; justify-content: flex-start; align-items: flex-end;">
+            <div class="form-group" style="width: 200px;">
+                <label for="date" class="form-label">Filter Date</label>
+                <input type="date" id="date" name="date" class="form-control" value="{{ selected_date or '' }}">
+            </div>
+            
+            {% if session.get('role') in ['Admin', 'HR'] %}
+            <div class="form-group" style="width: 220px;">
+                <label for="department_id" class="form-label">Filter Department</label>
+                <select id="department_id" name="department_id" class="form-control">
+                    <option value="">All Departments</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.department_id }}" {{ 'selected' if selected_dept == dept.department_id }}>
+                        {{ dept.department_name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            
+            <button type="submit" class="btn btn-secondary" style="height: 48px;">
+                <i class="bi bi-funnel"></i> Apply Filter
+            </button>
+            
+            {% if selected_date or selected_dept %}
+            <a href="{{ url_for('attendance.list_attendance') }}" class="btn btn-secondary" style="height: 48px;" title="Reset Filters">
+                <i class="bi bi-x-circle"></i> Reset
+            </a>
+            {% endif %}
+        </form>
+    </div>
+    
+    <!-- Logs Table -->
+    <div class="table-container">
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <th>Employee</th>
+                    <th>Department</th>
+                    {% endif %}
+                    <th>Date</th>
+                    <th>Status</th>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <th style="text-align: right;">Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <td style="font-weight: 600;">{{ record.employee_name }}</td>
+                    <td>{{ record.department_name or 'Unassigned' }}</td>
+                    {% endif %}
+                    <td>{{ record.date }}</td>
+                    <td>
+                        <span class="badge badge-{{ record.status|lower }}">{{ record.status }}</span>
+                    </td>
+                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    <td style="text-align: right;">
+                        <a href="{{ url_for('attendance.edit_attendance', attendance_id=record.attendance_id) }}" class="btn-icon-only" title="Modify Record">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                    </td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ 5 if session.get('role') in ['Admin', 'HR'] else 2 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                        No attendance records found for this date.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
