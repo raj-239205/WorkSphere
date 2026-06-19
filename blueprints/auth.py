@@ -3,11 +3,10 @@ from functools import wraps
 from services.user_service import UserService
 
 auth_bp = Blueprint('auth', __name__)
+user_service = UserService()
 
 def login_required(f):
-    """
-    Decorator to protect routes requiring authentication.
-    """
+    """Decorator to protect routes requiring authentication."""
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'user_id' not in session:
@@ -17,10 +16,7 @@ def login_required(f):
     return decorated_function
 
 def role_required(allowed_roles):
-    """
-    Decorator to restrict route access to specific user roles.
-    If the user role is not authorized, renders a 403 Access Denied page.
-    """
+    """Decorator to restrict route access to specific user roles."""
     if isinstance(allowed_roles, str):
         allowed_roles = [allowed_roles]
         
@@ -52,12 +48,12 @@ def login():
             flash("Please provide both username and password.", "danger")
             return render_template('auth/login.html')
             
-        user = UserService.authenticate_user(username, password)
+        user = user_service.authenticate_user(username, password, ip_address=request.remote_addr)
         if user:
             session['user_id'] = user.user_id
             session['username'] = user.username
             session['role'] = user.role
-            session['emp_id'] = user.emp_id
+            session['emp_id'] = user.emp_id  # Returns user_id for Employee, None otherwise
             
             flash(f"Welcome back, {user.username}!", "success")
             return redirect(url_for('dashboard.index'))
@@ -68,6 +64,9 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
+    user_id = session.get('user_id')
+    if user_id:
+        user_service.log_logout(user_id, ip_address=request.remote_addr)
     session.clear()
     flash("You have logged out successfully.", "info")
     return redirect(url_for('auth.login'))

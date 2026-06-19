@@ -1,42 +1,33 @@
+from database.db_manager import db
 from datetime import datetime
 
-class Leave:
-    def __init__(self, leave_id=None, emp_id=None, reason=None, start_date=None, end_date=None, status='Pending', employee_name=None):
-        self.leave_id = leave_id
+class LeaveRequest(db.Model):
+    """Leave Request entity."""
+    __tablename__ = 'leaves'
+    
+    leave_id = db.Column(db.Integer, primary_key=True)
+    emp_id = db.Column(db.Integer, db.ForeignKey('employees.user_id', ondelete='CASCADE'), nullable=False)
+    reason = db.Column(db.Text, nullable=True)
+    start_date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
+    end_date = db.Column(db.String(10), nullable=False)    # YYYY-MM-DD
+    status = db.Column(db.String(20), default='Pending', nullable=False)  # 'Pending', 'Approved', 'Rejected'
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Relationship to Employee
+    employee = db.relationship('Employee', backref=db.backref('leaves', cascade='all, delete-orphan', lazy=True))
+
+    def __init__(self, emp_id: int, reason: str, start_date: str, end_date: str, 
+                 status: str = 'Pending', is_active: bool = True, **kwargs):
+        super().__init__(**kwargs)
         self.emp_id = emp_id
         self.reason = reason
-        self.start_date = start_date  # YYYY-MM-DD
-        self.end_date = end_date      # YYYY-MM-DD
-        self.status = status          # 'Pending', 'Approved', 'Rejected'
-        self.employee_name = employee_name  # Joined attribute
+        self.start_date = start_date
+        self.end_date = end_date
+        self.status = status
+        self.is_active = is_active
 
-    @classmethod
-    def from_row(cls, row):
-        if not row:
-            return None
-        data = dict(row)
-        return cls(
-            leave_id=data.get('leave_id'),
-            emp_id=data.get('emp_id'),
-            reason=data.get('reason'),
-            start_date=data.get('start_date'),
-            end_date=data.get('end_date'),
-            status=data.get('status', 'Pending'),
-            employee_name=data.get('employee_name')
-        )
-
-    def to_dict(self):
-        return {
-            'leave_id': self.leave_id,
-            'emp_id': self.emp_id,
-            'reason': self.reason,
-            'start_date': self.start_date,
-            'end_date': self.end_date,
-            'status': self.status,
-            'employee_name': self.employee_name
-        }
-
-    def validate(self):
+    def validate(self) -> dict:
+        """Domain validations for dates and parameters."""
         errors = {}
         if not self.emp_id:
             errors['emp_id'] = 'Employee ID is required.'
@@ -56,7 +47,6 @@ class Leave:
         start_dt = None
         end_dt = None
         
-        # Parse and validate start date format
         try:
             if len(self.start_date) != 10 or self.start_date[4] != '-' or self.start_date[7] != '-':
                 raise ValueError()
@@ -64,7 +54,6 @@ class Leave:
         except (ValueError, IndexError):
             errors['start_date'] = 'Start date must be a valid date in YYYY-MM-DD format.'
             
-        # Parse and validate end date format
         try:
             if len(self.end_date) != 10 or self.end_date[4] != '-' or self.end_date[7] != '-':
                 raise ValueError()
@@ -75,7 +64,6 @@ class Leave:
         if errors:
             return errors
             
-        # Validate unrealistic year bounds (e.g. 202666)
         if start_dt.year < current_year or start_dt.year > max_year:
             errors['start_date'] = f'Start date year must be between {current_year} and {max_year}.'
         if end_dt.year < current_year or end_dt.year > max_year:
@@ -84,16 +72,26 @@ class Leave:
         if errors:
             return errors
             
-        # Validate start date is not in the past
         if start_dt < today:
             errors['start_date'] = 'Start date cannot be in the past.'
             
-        # Validate end date is not before start date
         if end_dt < start_dt:
             errors['end_date'] = 'End date cannot be earlier than start date.'
             
-        if not self.status or self.status not in ['Pending', 'Approved', 'Rejected']:
+        if self.status not in ['Pending', 'Approved', 'Rejected']:
             errors['status'] = 'Status must be Pending, Approved, or Rejected.'
             
         return errors
 
+    def to_dict(self) -> dict:
+        return {
+            'leave_id': self.leave_id,
+            'emp_id': self.emp_id,
+            'employee_name': self.employee.name if self.employee else None,
+            'department_name': self.employee.department.department_name if self.employee and self.employee.department else None,
+            'reason': self.reason,
+            'start_date': self.start_date,
+            'end_date': self.end_date,
+            'status': self.status,
+            'is_active': self.is_active
+        }

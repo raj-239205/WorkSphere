@@ -2,7 +2,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from blueprints.auth import login_required, role_required
 from services.employee_service import EmployeeService
 from services.department_service import DepartmentService
-from models.employee import Employee
+from models.user import Employee
 
 employee_bp = Blueprint('employee', __name__)
 

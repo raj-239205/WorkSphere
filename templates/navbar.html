@@ -49,6 +49,15 @@
                 </a>
             </li>
             
+            {% if session.get('role') == 'Admin' %}
+            <!-- Security Audit Trail -->
+            <li class="sidebar-item {{ 'active' if request.path == '/dashboard/audit-logs' }}">
+                <a href="{{ url_for('dashboard.audit_logs') }}">
+                    <i class="bi bi-shield-check"></i> Audit Logs
+                </a>
+            </li>
+            {% endif %}
+            
         {% elif session.get('role') == 'Employee' %}
             <!-- Employee Self-Service Options -->
             <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' }}">

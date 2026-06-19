@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY:-worksphere_secure_secret_key_12983719283}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-jwt_secret_key_worksphere_8923749823}
+      - DATABASE_URL=sqlite:////app/database/erp.db
+    volumes:
+      - db-data:/app/database
+      - log-data:/app/logs
+    restart: always
+
+volumes:
+  db-data:
+  log-data:

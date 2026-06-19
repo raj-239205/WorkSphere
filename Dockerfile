@@ -1,26 +1,35 @@
-# Use official lightweight Python image
-FROM python:3.11-slim
+# Stage 1: Build dependencies
+FROM python:3.11-slim AS builder
 
-# Set system environment variables
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --user -r requirements.txt
+
+# Stage 2: Final minimal runtime
+FROM python:3.11-slim AS runner
+
+WORKDIR /app
+
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app.py
+ENV FLASK_ENV=production
 
-# Set working directory inside container
-WORKDIR /app
+# Copy installed libraries from builder stage
+COPY --from=builder /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project files
+# Copy application code
 COPY . .
 
-# Bootstrap database schema and seed data
-RUN python init_db.py
-
-# Expose server port
+# Expose production port
 EXPOSE 5000
 
 # Start server using Gunicorn production WSGI HTTP server
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "run:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]

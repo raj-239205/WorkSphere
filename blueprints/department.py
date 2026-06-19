@@ -4,12 +4,13 @@ from services.department_service import DepartmentService
 from models.department import Department
 
 department_bp = Blueprint('department', __name__)
+department_service = DepartmentService()
 
 @department_bp.route('/departments')
 @login_required
 @role_required(['Admin', 'HR'])
 def list_departments():
-    departments = DepartmentService.get_all_departments()
+    departments = department_service.get_all_departments()
     return render_template('department/list.html', departments=departments)
 
 @department_bp.route('/department/add', methods=['GET', 'POST'])
@@ -29,7 +30,7 @@ def add_department():
             return render_template('department/add.html', form=request.form)
             
         try:
-            DepartmentService.create_department(name, manager)
+            department_service.create_department(name, manager)
             flash("Department created successfully!", "success")
             return redirect(url_for('department.list_departments'))
         except ValueError as e:
@@ -42,7 +43,7 @@ def add_department():
 @login_required
 @role_required(['Admin', 'HR'])
 def edit_department(department_id):
-    department = DepartmentService.get_department_by_id(department_id)
+    department = department_service.get_department_by_id(department_id)
     if not department:
         abort(404, description="Department not found.")
         
@@ -59,7 +60,7 @@ def edit_department(department_id):
             return render_template('department/edit.html', department=department)
             
         try:
-            DepartmentService.update_department(department_id, name, manager)
+            department_service.update_department(department_id, name, manager)
             flash("Department updated successfully!", "success")
             return redirect(url_for('department.list_departments'))
         except ValueError as e:
@@ -72,12 +73,12 @@ def edit_department(department_id):
 @login_required
 @role_required(['Admin', 'HR'])
 def delete_department(department_id):
-    department = DepartmentService.get_department_by_id(department_id)
+    department = department_service.get_department_by_id(department_id)
     if not department:
         abort(404, description="Department not found.")
         
     try:
-        DepartmentService.delete_department(department_id)
+        department_service.delete_department(department_id)
         flash(f"Department '{department.department_name}' deleted successfully.", "success")
     except ValueError as e:
         flash(str(e), "danger")

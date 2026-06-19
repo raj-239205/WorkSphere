@@ -1,39 +1,35 @@
-class Attendance:
-    def __init__(self, attendance_id=None, emp_id=None, date=None, status=None, employee_name=None):
-        self.attendance_id = attendance_id
+from database.db_manager import db
+
+class Attendance(db.Model):
+    """Attendance log entity."""
+    __tablename__ = 'attendance'
+    
+    attendance_id = db.Column(db.Integer, primary_key=True)
+    emp_id = db.Column(db.Integer, db.ForeignKey('employees.user_id', ondelete='CASCADE'), nullable=False)
+    date = db.Column(db.String(10), nullable=False)  # YYYY-MM-DD
+    status = db.Column(db.String(20), nullable=False)  # 'Present', 'Absent', 'Leave'
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    
+    # Relationship linkage to Employee
+    employee = db.relationship('Employee', backref=db.backref('attendances', cascade='all, delete-orphan', lazy=True))
+
+    __table_args__ = (
+        db.UniqueConstraint('emp_id', 'date', name='_emp_date_uc'),
+    )
+
+    def __init__(self, emp_id: int, date: str, status: str, is_active: bool = True, **kwargs):
+        super().__init__(**kwargs)
         self.emp_id = emp_id
-        self.date = date  # YYYY-MM-DD
-        self.status = status  # 'Present', 'Absent', 'Leave'
-        self.employee_name = employee_name  # Joined attribute
+        self.date = date
+        self.status = status
+        self.is_active = is_active
 
-    @classmethod
-    def from_row(cls, row):
-        if not row:
-            return None
-        data = dict(row)
-        return cls(
-            attendance_id=data.get('attendance_id'),
-            emp_id=data.get('emp_id'),
-            date=data.get('date'),
-            status=data.get('status'),
-            employee_name=data.get('employee_name')
-        )
-
-    def to_dict(self):
+    def to_dict(self) -> dict:
         return {
             'attendance_id': self.attendance_id,
             'emp_id': self.emp_id,
+            'employee_name': self.employee.name if self.employee else None,
             'date': self.date,
             'status': self.status,
-            'employee_name': self.employee_name
+            'is_active': self.is_active
         }
-
-    def validate(self):
-        errors = {}
-        if not self.emp_id:
-            errors['emp_id'] = 'Employee ID is required.'
-        if not self.date:
-            errors['date'] = 'Date is required.'
-        if not self.status or self.status not in ['Present', 'Absent', 'Leave']:
-            errors['status'] = 'Status must be Present, Absent, or Leave.'
-        return errors

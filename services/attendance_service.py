@@ -1,129 +1,148 @@
-from database.db import DB
+from services.base_service import BaseService
+from repositories.attendance_repository import AttendanceRepository
+from repositories.employee_repository import EmployeeRepository
+from repositories.activity_log_repository import ActivityLogRepository
+from exceptions.custom_exceptions import AttendanceValidationException
 from models.attendance import Attendance
+from models.activity_log import ActivityLog
+from database.db_manager import DatabaseManager
 from datetime import datetime
+from typing import List, Optional
+import json
 
-class AttendanceService:
-    @staticmethod
-    def get_attendance_records(date=None, emp_id=None, department_id=None):
-        """
-        Retrieves attendance records with optional filters for date, employee, and department.
-        """
-        query = """
-            SELECT a.*, e.name as employee_name, d.department_name
-            FROM attendance a
-            JOIN employees e ON a.emp_id = e.emp_id
-            LEFT JOIN departments d ON e.department_id = d.department_id
-            WHERE 1=1
-        """
-        params = []
+class AttendanceService(BaseService):
+    """Attendance business logic service layer."""
+
+    def __init__(self, attendance_repo: AttendanceRepository = None, 
+                 employee_repo: EmployeeRepository = None, 
+                 activity_log_repo: ActivityLogRepository = None):
+        self.attendance_repo = attendance_repo or AttendanceRepository()
+        self.employee_repo = employee_repo or EmployeeRepository()
+        self.activity_log_repo = activity_log_repo or ActivityLogRepository()
+        self.db_manager = DatabaseManager()
+
+    def get_attendance_records(self, date: str = None, emp_id: int = None, department_id: int = None) -> List[Attendance]:
+        """Retrieves attendance records with optional filters for date, employee, and department."""
+        from database.db_manager import db
+        from models.user import Employee
+        
+        query = db.session.query(Attendance).join(Employee, Attendance.emp_id == Employee.user_id)
+        query = query.filter(Attendance.is_active == True, Employee.is_active == True)
+        
         if date:
-            query += " AND a.date = ?"
-            params.append(date)
+            query = query.filter(Attendance.date == date)
         if emp_id:
-            query += " AND a.emp_id = ?"
-            params.append(emp_id)
+            query = query.filter(Attendance.emp_id == emp_id)
         if department_id:
-            query += " AND e.department_id = ?"
-            params.append(department_id)
+            query = query.filter(Employee.department_id == department_id)
             
-        query += " ORDER BY a.date DESC, e.name ASC"
-        rows = DB.execute_query(query, params, fetch_all=True)
-        return [Attendance.from_row(row) for row in rows]
+        return query.order_by(Attendance.date.desc(), Employee.name.asc()).all()
 
-    @staticmethod
-    def get_attendance_by_id(attendance_id):
-        query = """
-            SELECT a.*, e.name as employee_name
-            FROM attendance a
-            JOIN employees e ON a.emp_id = e.emp_id
-            WHERE a.attendance_id = ?
-        """
-        row = DB.execute_query(query, (attendance_id,), fetch_one=True)
-        return Attendance.from_row(row) if row else None
+    def get_attendance_by_id(self, attendance_id: int) -> Optional[Attendance]:
+        return self.attendance_repo.get_by_id(attendance_id)
 
-    @staticmethod
-    def mark_attendance(emp_id, date, status):
-        """
-        Marks attendance for an employee on a given date.
-        If a record already exists, it updates it. (Upsert behavior)
-        """
-        # Check if record already exists
-        check_query = "SELECT attendance_id FROM attendance WHERE emp_id = ? AND date = ?"
-        existing = DB.execute_query(check_query, (emp_id, date), fetch_one=True)
-        
-        if existing:
-            query = "UPDATE attendance SET status = ? WHERE attendance_id = ?"
-            DB.execute_query(query, (status, existing['attendance_id']))
-            return existing['attendance_id']
-        else:
-            query = "INSERT INTO attendance (emp_id, date, status) VALUES (?, ?, ?)"
-            return DB.execute_query(query, (emp_id, date, status))
+    def mark_attendance(self, emp_id: int, date: str, status: str) -> int:
+        """Marks attendance for an employee on a given date (with upsert behavior)."""
+        if status not in ['Present', 'Absent', 'Leave']:
+            raise AttendanceValidationException("Status must be 'Present', 'Absent', or 'Leave'")
+            
+        with self.db_manager.session_scope():
+            # Verify employee exists and is active
+            emp = self.employee_repo.get_by_id(emp_id)
+            if not emp or not emp.is_active:
+                raise AttendanceValidationException(f"Active employee with ID {emp_id} not found.")
 
-    @staticmethod
-    def update_attendance(attendance_id, status):
-        query = "UPDATE attendance SET status = ? WHERE attendance_id = ?"
-        DB.execute_query(query, (status, attendance_id))
-
-    @staticmethod
-    def delete_attendance(attendance_id):
-        query = "DELETE FROM attendance WHERE attendance_id = ?"
-        DB.execute_query(query, (attendance_id,))
-
-    @staticmethod
-    def get_today_stats():
-        """
-        Returns stats for today's attendance.
-        """
-        today = datetime.now().strftime('%Y-%m-%d')
-        
-        # Get count of total active employees
-        emp_count_query = "SELECT COUNT(*) as count FROM employees"
-        total_emp_row = DB.execute_query(emp_count_query, fetch_one=True)
-        total_employees = total_emp_row['count'] if total_emp_row else 0
-        
-        # Get attendance status counts for today
-        status_query = """
-            SELECT status, COUNT(*) as count 
-            FROM attendance 
-            WHERE date = ? 
-            GROUP BY status
-        """
-        rows = DB.execute_query(status_query, (today,), fetch_all=True)
-        
-        stats = {'Present': 0, 'Absent': 0, 'Leave': 0}
-        for row in rows:
-            if row['status'] in stats:
-                stats[row['status']] = row['count']
+            existing = self.attendance_repo.get_by_emp_and_date(emp_id, date)
+            if existing:
+                old_status = existing.status
+                existing.status = status
+                self.attendance_repo.update(existing)
                 
-        # Employees who haven't been marked are considered "Unmarked" or "Absent" by default,
-        # but let's just show counts of explicit marks.
-        # To make it realistic, unmarked = total_employees - sum(marked)
+                # Log audit trail
+                log = ActivityLog(
+                    user_id=None,
+                    action_type="Attendance Marked (Updated)",
+                    old_value=json.dumps({"emp_id": emp_id, "date": date, "status": old_status}),
+                    new_value=json.dumps({"emp_id": emp_id, "date": date, "status": status})
+                )
+                self.activity_log_repo.create(log)
+                return existing.attendance_id
+            else:
+                record = Attendance(emp_id=emp_id, date=date, status=status)
+                created = self.attendance_repo.create(record)
+                
+                # Log audit trail
+                log = ActivityLog(
+                    user_id=None,
+                    action_type="Attendance Marked (Created)",
+                    new_value=json.dumps({"emp_id": emp_id, "date": date, "status": status})
+                )
+                self.activity_log_repo.create(log)
+                return created.attendance_id
+
+    def update_attendance(self, attendance_id: int, status: str) -> None:
+        if status not in ['Present', 'Absent', 'Leave']:
+            raise AttendanceValidationException("Status must be 'Present', 'Absent', or 'Leave'")
+            
+        with self.db_manager.session_scope():
+            record = self.attendance_repo.get_by_id(attendance_id)
+            if not record:
+                raise AttendanceValidationException(f"Attendance record with ID {attendance_id} not found.")
+                
+            old_status = record.status
+            record.status = status
+            self.attendance_repo.update(record)
+            
+            # Log audit trail
+            log = ActivityLog(
+                user_id=None,
+                action_type="Attendance Updated",
+                old_value=json.dumps({"attendance_id": attendance_id, "status": old_status}),
+                new_value=json.dumps({"attendance_id": attendance_id, "status": status})
+            )
+            self.activity_log_repo.create(log)
+
+    def delete_attendance(self, attendance_id: int) -> None:
+        with self.db_manager.session_scope():
+            record = self.attendance_repo.get_by_id(attendance_id)
+            if not record:
+                raise AttendanceValidationException(f"Attendance record with ID {attendance_id} not found.")
+                
+            old_state = json.dumps(record.to_dict())
+            self.attendance_repo.delete(attendance_id)
+            
+            # Log audit trail
+            log = ActivityLog(
+                user_id=None,
+                action_type="Attendance Deleted",
+                old_value=old_state
+            )
+            self.activity_log_repo.create(log)
+
+    def get_today_stats(self) -> dict:
+        """Returns statistical counts and rate for today's attendance."""
+        today = datetime.now().strftime('%Y-%m-%d')
+        active_employees = self.employee_repo.get_all(include_inactive=False)
+        total_employees = len(active_employees)
+        
+        today_records = self.get_attendance_records(date=today)
+        stats = {'Present': 0, 'Absent': 0, 'Leave': 0}
+        for record in today_records:
+            if record.status in stats:
+                stats[record.status] += 1
+                
         marked_count = sum(stats.values())
         unmarked = max(0, total_employees - marked_count)
         
-        # Let's count unmarked as absent for attendance calculation if appropriate,
-        # but for visual dashboard:
         stats['TotalEmployees'] = total_employees
         stats['Unmarked'] = unmarked
         
-        # Calculate attendance percentage
-        # Present / (Present + Absent) * 100
         present = stats['Present']
-        absent = stats['Absent'] + unmarked # Treat unmarked as absent/not present
+        absent = stats['Absent'] + unmarked
         total_active_for_attendance = present + absent
         
         stats['AttendanceRate'] = round((present / total_active_for_attendance * 100), 1) if total_active_for_attendance > 0 else 0.0
-        
         return stats
 
-    @staticmethod
-    def get_recent_activity(limit=5):
-        query = """
-            SELECT a.*, e.name as employee_name
-            FROM attendance a
-            JOIN employees e ON a.emp_id = e.emp_id
-            ORDER BY a.attendance_id DESC
-            LIMIT ?
-        """
-        rows = DB.execute_query(query, (limit,), fetch_all=True)
-        return [Attendance.from_row(row) for row in rows]
+    def get_recent_activity(self, limit: int = 5) -> List[Attendance]:
+        return self.attendance_repo.get_recent(limit)
