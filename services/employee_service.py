@@ -1,10 +1,12 @@
 from services.base_service import BaseService
 from repositories.employee_repository import EmployeeRepository
 from repositories.activity_log_repository import ActivityLogRepository
-from exceptions.custom_exceptions import EmployeeNotFoundException
+from exceptions.custom_exceptions import EmployeeNotFoundException, UnauthorizedAccessException
 from models.user import Employee
 from models.activity_log import ActivityLog
 from database.db_manager import DatabaseManager
+from utils.security import check_permission, get_current_user_details, has_permission, log_auth_event
+from flask import has_request_context, request
 from typing import List, Optional
 import json
 
@@ -17,17 +19,50 @@ class EmployeeService(BaseService):
         self.db_manager = DatabaseManager()
 
     def get_all_employees(self, search_query: str = None, department_id: int = None, include_inactive: bool = False) -> List[Employee]:
+        check_permission('can_view_employees', "View Employee Directory")
         return self.employee_repo.get_all(search_query, department_id, include_inactive)
 
     def get_employee_by_id(self, emp_id: int) -> Optional[Employee]:
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            user_id = user_details.get('user_id')
+            if not has_permission(role, 'can_view_employees'):
+                if has_permission(role, 'can_view_own_profile') and int(emp_id) == int(user_id):
+                    # Allowed own profile
+                    pass
+                else:
+                    log_auth_event(
+                        user_id, user_details.get('username'), role, 
+                        'can_view_employees', f"View Employee ID {emp_id}", 'Denied', 
+                        request.remote_addr if has_request_context() else '127.0.0.1'
+                    )
+                    raise UnauthorizedAccessException("You do not have permission to access this employee profile.")
         return self.employee_repo.get_by_id(emp_id)
 
     def get_employee_by_email(self, email: str) -> Optional[Employee]:
-        return self.employee_repo.get_by_email(email)
+        emp = self.employee_repo.get_by_email(email)
+        if emp:
+            user_details = get_current_user_details()
+            if user_details:
+                role = user_details.get('role')
+                user_id = user_details.get('user_id')
+                if not has_permission(role, 'can_view_employees'):
+                    if has_permission(role, 'can_view_own_profile') and int(emp.user_id) == int(user_id):
+                        pass
+                    else:
+                        log_auth_event(
+                            user_id, user_details.get('username'), role, 
+                            'can_view_employees', f"View Employee by Email {email}", 'Denied', 
+                            request.remote_addr if has_request_context() else '127.0.0.1'
+                        )
+                        raise UnauthorizedAccessException("You do not have permission to access this employee profile.")
+        return emp
 
     def create_employee(self, name: str, email: str, phone: str, department_id: int, 
                         salary: float, designation: str, username: str = None, password: str = None) -> Employee:
         """Creates a new Employee record. Links it to a User entity automatically via Joined Table Inheritance."""
+        check_permission('can_add_employee', "Create Employee Attempt")
         with self.db_manager.session_scope():
             # Validate unique email
             existing = self.employee_repo.get_by_email(email)
@@ -69,6 +104,7 @@ class EmployeeService(BaseService):
     def update_employee(self, emp_id: int, name: str, email: str, phone: str, 
                         department_id: int, salary: float, designation: str) -> None:
         """Updates Employee details. Performs validation checks on inputs."""
+        check_permission('can_edit_employee', f"Update Employee ID {emp_id} Attempt")
         with self.db_manager.session_scope():
             emp = self.employee_repo.get_by_id(emp_id)
             if not emp:
@@ -100,6 +136,7 @@ class EmployeeService(BaseService):
 
     def delete_employee(self, emp_id: int) -> None:
         """Soft-deletes employee by marking is_active = False."""
+        check_permission('can_delete_employee', f"Delete Employee ID {emp_id} Attempt")
         with self.db_manager.session_scope():
             emp = self.employee_repo.get_by_id(emp_id)
             if not emp:
@@ -118,6 +155,7 @@ class EmployeeService(BaseService):
 
     def restore_employee(self, emp_id: int) -> None:
         """Restores soft-deleted employee by marking is_active = True."""
+        check_permission('can_delete_employee', f"Restore Employee ID {emp_id} Attempt")
         with self.db_manager.session_scope():
             emp = self.employee_repo.get_by_id(emp_id)
             if not emp:

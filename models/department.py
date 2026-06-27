@@ -25,11 +25,16 @@ class Department(db.Model):
             errors['department_name'] = 'Department name is required.'
         return errors
 
+    @property
+    def employee_count(self) -> int:
+        """Returns the count of active employees in the department."""
+        return len([e for e in self.employees if e.is_active])
+
     def to_dict(self) -> dict:
         return {
             'department_id': self.department_id,
             'department_name': self.department_name,
             'manager_name': self.manager_name,
             'is_active': self.is_active,
-            'employee_count': len([e for e in self.employees if e.is_active])
+            'employee_count': self.employee_count
         }

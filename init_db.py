@@ -7,6 +7,47 @@ from services.attendance_service import AttendanceService
 from services.leave_service import LeaveService
 from datetime import datetime, timedelta
 
+def create_default_admin():
+    """Seeds the default Admin user credentials if not present."""
+    from services.user_service import UserService
+    user_service = UserService()
+    try:
+        admin = user_service.create_user("admin", "Admin", "admin123")
+        print("Seeded default Admin user.")
+        return admin
+    except ValueError as e:
+        print(f"Default Admin user already exists: {e}")
+        return user_service.get_user_by_username("admin")
+
+def create_default_hr(hr_dept_id):
+    """Seeds the default HR employee and user credentials if not present."""
+    from services.employee_service import EmployeeService
+    from services.user_service import UserService
+    employee_service = EmployeeService()
+    user_service = UserService()
+    try:
+        hr_emp = employee_service.create_employee(
+            name="Sudhanshu Sharma",
+            email="hr@worksphere.com",
+            phone="9876543210",
+            department_id=hr_dept_id,
+            salary=95000.0,
+            designation="HR Manager",
+            username="hr_user",
+            password="hr1234"
+        )
+        with db.session.no_autoflush:
+            user = user_service.get_user_by_id(hr_emp.user_id)
+            if user:
+                user.role = 'HR'
+                db.session.add(user)
+                db.session.commit()
+        print("Seeded default HR user.")
+        return hr_emp
+    except Exception as e:
+        print(f"Default HR user already exists/skipped: {e}")
+        return employee_service.get_employee_by_email("hr@worksphere.com")
+
 def seed_data():
     print("Seeding database using SQLAlchemy ORM...")
     
@@ -33,21 +74,23 @@ def seed_data():
             print(f"Department exists: {name}")
 
     # 2. Seed Users & Employees
-    user_service = UserService()
-    employee_service = EmployeeService()
+    # Seed Default Admin
+    create_default_admin()
     
-    # Seed Admin User
-    try:
-        user_service.create_user("admin", "Admin", "admin123")
-        print("Seeded Admin user.")
-    except ValueError as e:
-        print(f"Admin user seeding: {e}")
+    # Seed Default HR
+    hr_dept_id = dept_map.get("Human Resources")
+    hr_emp = create_default_hr(hr_dept_id)
+    
+    emp_map = {}
+    if hr_emp:
+        emp_map["hr@worksphere.com"] = hr_emp.user_id
         
-    # Seed Employees (including HR and Employee roles)
-    # Note: HR is created as an Employee with role="HR".
+    employee_service = EmployeeService()
+    user_service = UserService()
+    
+    # Seed other Employees (excluding HR)
     employees_to_seed = [
         # (name, email, phone, department, salary, designation, username, password, role)
-        ("Sudhanshu Sharma", "sudhanshu@worksphere.com", "9876543210", "Human Resources", 95000.0, "HR Manager", "hr_user", "hr1234", "HR"),
         ("Rajveer Choudhary", "rajveer@worksphere.com", "1234567890", "Software Engineering", 35000.0, "Software Engineering Intern", "emp_user", "emp123", "Employee"),
         ("Amit Patel", "amit@worksphere.com", "5551234567", "Software Engineering", 120000.0, "Lead Software Architect", "amit", "WorkSphere123", "Employee"),
         ("Neha Sharma", "neha@worksphere.com", "4445556666", "Software Engineering", 85000.0, "Senior UI Designer", "neha", "WorkSphere123", "Employee"),
@@ -55,7 +98,6 @@ def seed_data():
         ("Alok Verma", "alok@worksphere.com", "8889990000", "Administration", 80000.0, "Operations Specialist", "alok", "WorkSphere123", "Employee")
     ]
     
-    emp_map = {}
     for name, email, phone, dept_name, salary, desig, uname, passwd, role in employees_to_seed:
         try:
             dept_id = dept_map.get(dept_name)

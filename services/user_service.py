@@ -4,6 +4,9 @@ from repositories.activity_log_repository import ActivityLogRepository
 from models.user import User, Admin, HR, Employee
 from models.activity_log import ActivityLog
 from database.db_manager import DatabaseManager
+from utils.security import check_permission, get_current_user_details, has_permission, log_auth_event
+from exceptions.custom_exceptions import UnauthorizedAccessException
+from flask import has_request_context, request
 from typing import List, Optional
 import json
 
@@ -16,14 +19,40 @@ class UserService(BaseService):
         self.db_manager = DatabaseManager()
 
     def get_user_by_id(self, user_id: int) -> Optional[User]:
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            curr_id = user_details.get('user_id')
+            if not has_permission(role, 'can_manage_users'):
+                if has_permission(role, 'can_view_own_profile') and int(user_id) == int(curr_id):
+                    pass
+                else:
+                    log_auth_event(
+                        curr_id, user_details.get('username'), role, 
+                        'can_manage_users', f"View User ID {user_id}", 'Denied', 
+                        request.remote_addr if has_request_context() else '127.0.0.1'
+                    )
+                    raise UnauthorizedAccessException("You do not have permission to access this user account details.")
         return self.user_repo.get_by_id(user_id)
 
     def get_user_by_username(self, username: str) -> Optional[User]:
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            curr_username = user_details.get('username')
+            if not has_permission(role, 'can_manage_users'):
+                if username != curr_username:
+                    log_auth_event(
+                        user_details.get('user_id'), curr_username, role, 
+                        'can_manage_users', f"View User by Username {username}", 'Denied', 
+                        request.remote_addr if has_request_context() else '127.0.0.1'
+                    )
+                    raise UnauthorizedAccessException("You do not have permission to view other users.")
         return self.user_repo.get_by_username(username)
 
     def authenticate_user(self, username: str, password: str, ip_address: str = None) -> Optional[User]:
         """Authenticates user username and password. Logs the login attempt."""
-        user = self.get_user_by_username(username)
+        user = self.user_repo.get_by_username(username)
         if user and user.is_active and user.check_password(password):
             with self.db_manager.session_scope():
                 log = ActivityLog(
@@ -56,6 +85,7 @@ class UserService(BaseService):
 
     def create_user(self, username: str, role: str, password: str = None, **kwargs) -> User:
         """Creates and registers a new User / Admin / HR / Employee role."""
+        check_permission('can_manage_users', f"Create User {username} Attempt")
         with self.db_manager.session_scope():
             existing = self.user_repo.get_by_username(username)
             if existing:
@@ -97,6 +127,7 @@ class UserService(BaseService):
             return created_user
 
     def get_all_users(self) -> List[User]:
+        check_permission('can_manage_users', "View All Users List")
         return self.user_repo.get_all()
         
     def log_api_access(self, user_id: int, action_type: str, ip_address: str = None, details: str = None) -> None:

@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
-from blueprints.auth import login_required, role_required
+from utils.security import permission_required, has_permission
 from services.attendance_service import AttendanceService
 from services.employee_service import EmployeeService
 from services.department_service import DepartmentService
@@ -14,17 +14,17 @@ department_service = DepartmentService()
 
 @attendance_bp.route('/attendance')
 @attendance_bp.route('/attendance/records')
-@login_required
+@permission_required('can_view_own_attendance')
 def list_attendance():
     role = session.get('role')
-    emp_id = session.get('emp_id')
+    emp_id = session.get('user_id')
     
     date_filter = request.args.get('date', '').strip()
     dept_filter = request.args.get('department_id', '')
     
     dept_id = int(dept_filter) if dept_filter.isdigit() else None
     
-    if role in ['Admin', 'HR']:
+    if has_permission(role, 'can_view_attendance'):
         records = attendance_service.get_attendance_records(
             date=date_filter if date_filter else None,
             department_id=dept_id
@@ -37,7 +37,7 @@ def list_attendance():
             selected_date=date_filter,
             selected_dept=dept_id
         )
-    elif role == 'Employee':
+    else:
         if not emp_id:
             flash("Employee profile not linked.", "warning")
             return redirect(url_for('dashboard.index'))
@@ -51,12 +51,9 @@ def list_attendance():
             records=records,
             selected_date=date_filter
         )
-        
-    return redirect(url_for('auth.login'))
 
 @attendance_bp.route('/attendance/mark', methods=['GET', 'POST'])
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_manage_attendance')
 def mark_attendance():
     date_str = request.args.get('date', '').strip()
     if not date_str:
@@ -93,8 +90,7 @@ def mark_attendance():
     )
 
 @attendance_bp.route('/attendance/edit/<int:attendance_id>', methods=['GET', 'POST'])
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_manage_attendance')
 def edit_attendance(attendance_id):
     record = attendance_service.get_attendance_by_id(attendance_id)
     if not record:

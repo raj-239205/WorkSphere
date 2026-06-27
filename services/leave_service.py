@@ -1,11 +1,13 @@
 from services.base_service import BaseService
 from repositories.leave_repository import LeaveRepository
 from repositories.activity_log_repository import ActivityLogRepository
-from exceptions.custom_exceptions import LeaveValidationException
+from exceptions.custom_exceptions import LeaveValidationException, UnauthorizedAccessException
 from models.leave import LeaveRequest
 from models.activity_log import ActivityLog
 from database.db_manager import DatabaseManager
 from services.attendance_service import AttendanceService
+from utils.security import check_permission, get_current_user_details, has_permission, log_auth_event
+from flask import has_request_context, request
 from datetime import datetime, timedelta
 from typing import List, Optional
 import json
@@ -27,6 +29,22 @@ class LeaveService(BaseService):
         from database.db_manager import db
         from models.user import Employee
         
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            user_id = user_details.get('user_id')
+            if not has_permission(role, 'can_view_leaves'):
+                if has_permission(role, 'can_view_own_leaves') and (emp_id is None or int(emp_id) == int(user_id)):
+                    # Restrict to own user ID
+                    emp_id = user_id
+                else:
+                    log_auth_event(
+                        user_id, user_details.get('username'), role, 
+                        'can_view_leaves', "View Leave Requests List", 'Denied', 
+                        request.remote_addr if has_request_context() else '127.0.0.1'
+                    )
+                    raise UnauthorizedAccessException("You do not have permission to view other employee leave requests.")
+
         query = db.session.query(LeaveRequest).join(Employee, LeaveRequest.emp_id == Employee.user_id)
         query = query.filter(LeaveRequest.is_active == True, Employee.is_active == True)
         
@@ -42,10 +60,35 @@ class LeaveService(BaseService):
         return query.order_by(order_case, LeaveRequest.start_date.desc()).all()
 
     def get_leave_by_id(self, leave_id: int) -> Optional[LeaveRequest]:
-        return self.leave_repo.get_by_id(leave_id)
+        record = self.leave_repo.get_by_id(leave_id)
+        if record:
+            user_details = get_current_user_details()
+            if user_details:
+                role = user_details.get('role')
+                user_id = user_details.get('user_id')
+                if not has_permission(role, 'can_view_leaves'):
+                    if has_permission(role, 'can_view_own_leaves') and int(record.emp_id) == int(user_id):
+                        pass
+                    else:
+                        log_auth_event(
+                            user_id, user_details.get('username'), role, 
+                            'can_view_leaves', f"View Leave request ID {leave_id}", 'Denied', 
+                            request.remote_addr if has_request_context() else '127.0.0.1'
+                        )
+                        raise UnauthorizedAccessException("You do not have permission to access this leave request.")
+        return record
 
     def apply_leave(self, emp_id: int, reason: str, start_date: str, end_date: str) -> LeaveRequest:
         """Applies for a new leave request. Performs range checks and overlap validations."""
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            user_id = user_details.get('user_id')
+            if int(emp_id) == int(user_id):
+                check_permission('can_view_own_leaves', f"Apply Leave for own account (ID {emp_id})")
+            else:
+                check_permission('can_approve_leave', f"Apply Leave on behalf of Employee ID {emp_id}")
+
         with self.db_manager.session_scope():
             req = LeaveRequest(emp_id=emp_id, reason=reason, start_date=start_date, end_date=end_date)
             errors = req.validate()
@@ -70,6 +113,7 @@ class LeaveService(BaseService):
 
     def update_leave_status(self, leave_id: int, status: str) -> None:
         """Approves or rejects a leave request. Automatically logs 'Leave' attendance on approval."""
+        check_permission('can_approve_leave', f"Update Leave Status for ID {leave_id} to {status} Attempt")
         if status not in ['Approved', 'Rejected', 'Pending']:
             raise LeaveValidationException("Invalid status value.")
             
@@ -102,12 +146,15 @@ class LeaveService(BaseService):
                     curr += timedelta(days=1)
 
     def get_pending_count(self) -> int:
+        check_permission('can_view_leaves', "Get Pending Leaves Count")
         return self.leave_repo.get_pending_count()
 
     def get_recent_requests(self, limit: int = 5) -> List[LeaveRequest]:
+        check_permission('can_view_leaves', "Get Recent Leave Requests")
         return self.leave_repo.get_recent(limit)
 
     def delete_leave(self, leave_id: int) -> None:
+        check_permission('can_approve_leave', f"Delete Leave ID {leave_id} Attempt")
         with self.db_manager.session_scope():
             leave = self.leave_repo.get_by_id(leave_id)
             if not leave:

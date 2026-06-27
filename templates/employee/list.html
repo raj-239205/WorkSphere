@@ -7,9 +7,11 @@
 <div class="glass-card">
     <div class="card-header-custom">
         <h3 class="card-title-custom"><i class="bi bi-people-fill"></i> Employee Directory</h3>
+        {% if has_permission(session.get('role'), 'can_add_employee') %}
         <a href="{{ url_for('employee.add_employee') }}" class="btn btn-primary">
             <i class="bi bi-person-plus"></i> Add Employee
         </a>
+        {% endif %}
     </div>
     
     <!-- Filter and Search Bar -->
@@ -56,7 +58,9 @@
                     <th>Department</th>
                     <th>Designation</th>
                     <th>Salary</th>
+                    {% if has_permission(session.get('role'), 'can_view_employees') or has_permission(session.get('role'), 'can_edit_employee') or has_permission(session.get('role'), 'can_delete_employee') %}
                     <th style="text-align: right;">Actions</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -72,21 +76,29 @@
                     </td>
                     <td>{{ emp.designation or 'N/A' }}</td>
                     <td style="font-family: monospace; font-weight: 600;">${{ emp.salary }}</td>
+                    {% if has_permission(session.get('role'), 'can_view_employees') or has_permission(session.get('role'), 'can_edit_employee') or has_permission(session.get('role'), 'can_delete_employee') %}
                     <td>
                         <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                            {% if has_permission(session.get('role'), 'can_view_employees') or (has_permission(session.get('role'), 'can_view_own_profile') and emp.emp_id == session.get('user_id')) %}
                             <a href="{{ url_for('employee.view_employee', emp_id=emp.emp_id) }}" class="btn-icon-only" title="View Profile">
                                 <i class="bi bi-eye"></i>
                             </a>
+                            {% endif %}
+                            {% if has_permission(session.get('role'), 'can_edit_employee') %}
                             <a href="{{ url_for('employee.edit_employee', emp_id=emp.emp_id) }}" class="btn-icon-only" title="Edit Employee">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            {% endif %}
+                            {% if has_permission(session.get('role'), 'can_delete_employee') %}
                             <form action="{{ url_for('employee.delete_employee', emp_id=emp.emp_id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete employee \'{{ emp.name }}\'? All their attendance and leaves will be deleted.');">
                                 <button type="submit" class="btn-icon-only btn-icon-delete" title="Delete Employee">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
+                    {% endif %}
                 </tr>
                 {% else %}
                 <tr>

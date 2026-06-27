@@ -57,12 +57,13 @@ def create_app(config_class=None):
             return redirect(url_for('dashboard.index'))
         return redirect(url_for('auth.login'))
         
-    # Context Processor for active navigation states
+    # Context Processor for active navigation states & RBAC
     @app.context_processor
     def inject_active_class():
+        from utils.security import has_permission
         def active_class(blueprint_name):
             return 'active' if request.blueprint == blueprint_name else ''
-        return dict(active_class=active_class)
+        return dict(active_class=active_class, has_permission=has_permission)
         
     return app
 

@@ -13,70 +13,80 @@
             </a>
         </li>
         
-        {% if session.get('role') in ['Admin', 'HR'] %}
-            <!-- Employee Management -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' }}">
-                <a href="{{ url_for('employee.list_employees') }}">
-                    <i class="bi bi-people-fill"></i> Employees
-                </a>
-            </li>
-            
-            <!-- Department Management -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'department' }}">
-                <a href="{{ url_for('department.list_departments') }}">
-                    <i class="bi bi-building-fill"></i> Departments
-                </a>
-            </li>
-            
-            <!-- Attendance Logs & Marking -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'attendance' }}">
-                <a href="{{ url_for('attendance.list_attendance') }}">
-                    <i class="bi bi-calendar-check-fill"></i> Attendance
-                </a>
-            </li>
-            
-            <!-- Leave Requests Approval -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'leave' }}">
-                <a href="{{ url_for('leave.list_leaves') }}">
-                    <i class="bi bi-file-earmark-text-fill"></i> Leave Requests
-                </a>
-            </li>
-            
-            <!-- Reports & Analytics -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'reports' }}">
-                <a href="{{ url_for('reports.index') }}">
-                    <i class="bi bi-bar-chart-line-fill"></i> Reports & Stats
-                </a>
-            </li>
-            
-            {% if session.get('role') == 'Admin' %}
-            <!-- Security Audit Trail -->
-            <li class="sidebar-item {{ 'active' if request.path == '/dashboard/audit-logs' }}">
-                <a href="{{ url_for('dashboard.audit_logs') }}">
-                    <i class="bi bi-shield-check"></i> Audit Logs
-                </a>
-            </li>
-            {% endif %}
-            
-        {% elif session.get('role') == 'Employee' %}
-            <!-- Employee Self-Service Options -->
-            <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' }}">
+        <!-- HR / Admin Workforce Management Options -->
+        {% if has_permission(session.get('role'), 'can_view_employees') %}
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'employee' and request.path != '/employee/profile' and not request.path.startswith('/employee/view/') }}">
+            <a href="{{ url_for('employee.list_employees') }}">
+                <i class="bi bi-people-fill"></i> Employees
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_departments') %}
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'department' }}">
+            <a href="{{ url_for('department.list_departments') }}">
+                <i class="bi bi-building-fill"></i> Departments
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_attendance') %}
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'attendance' and not session.get('role') == 'Employee' }}">
+            <a href="{{ url_for('attendance.list_attendance') }}">
+                <i class="bi bi-calendar-check-fill"></i> Attendance
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_leaves') %}
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'leave' and not session.get('role') == 'Employee' }}">
+            <a href="{{ url_for('leave.list_leaves') }}">
+                <i class="bi bi-file-earmark-text-fill"></i> Leave Requests
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_reports') %}
+        <li class="sidebar-item {{ 'active' if request.blueprint == 'reports' }}">
+            <a href="{{ url_for('reports.index') }}">
+                <i class="bi bi-bar-chart-line-fill"></i> Reports & Stats
+            </a>
+        </li>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_audit_logs') %}
+        <li class="sidebar-item {{ 'active' if request.path == '/dashboard/audit-logs' }}">
+            <a href="{{ url_for('dashboard.audit_logs') }}">
+                <i class="bi bi-shield-check"></i> Audit Logs
+            </a>
+        </li>
+        {% endif %}
+        
+        <!-- Employee Self-Service Options -->
+        {% if session.get('role') == 'Employee' %}
+            {% if has_permission(session.get('role'), 'can_view_own_profile') %}
+            <li class="sidebar-item {{ 'active' if request.path == '/employee/profile' or request.path.startswith('/employee/view/') }}">
                 <a href="{{ url_for('employee.profile') }}">
                     <i class="bi bi-person-badge-fill"></i> My Profile
                 </a>
             </li>
+            {% endif %}
             
+            {% if has_permission(session.get('role'), 'can_view_own_attendance') %}
             <li class="sidebar-item {{ 'active' if request.blueprint == 'attendance' }}">
                 <a href="{{ url_for('attendance.list_attendance') }}">
                     <i class="bi bi-calendar-check-fill"></i> My Attendance
                 </a>
             </li>
+            {% endif %}
             
+            {% if has_permission(session.get('role'), 'can_view_own_leaves') %}
             <li class="sidebar-item {{ 'active' if request.blueprint == 'leave' }}">
                 <a href="{{ url_for('leave.list_leaves') }}">
                     <i class="bi bi-calendar2-plus-fill"></i> Apply Leave
                 </a>
             </li>
+            {% endif %}
         {% endif %}
     </ul>
     

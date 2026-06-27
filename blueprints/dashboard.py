@@ -1,7 +1,7 @@
-from flask import Blueprint, render_template, session, redirect, url_for
-from blueprints.auth import login_required, role_required
+from flask import Blueprint, render_template, session, redirect, url_for, request
+from blueprints.auth import login_required
+from utils.security import permission_required
 from repositories.activity_log_repository import ActivityLogRepository
-from flask import request
 
 activity_log_repo = ActivityLogRepository()
 from services.employee_service import EmployeeService
@@ -26,24 +26,44 @@ def index():
     emp_id = session.get('emp_id')
     
     if role in ['Admin', 'HR']:
-        # Fetch Admin/HR Company-wide stats
-        stats = attendance_service.get_today_stats()
-        pending_leaves = leave_service.get_pending_count()
-        recent_attendance = attendance_service.get_recent_activity(5)
-        recent_leaves = leave_service.get_recent_requests(5)
-        departments = department_service.get_all_departments()
-        
-        # Trigger dynamic charts generation using Pandas/NumPy/Matplotlib
-        analytics_service.generate_charts()
-        
-        # Load live workforce analytics summary
-        workforce_data = analytics_service.get_workforce_analytics()
-        leave_stats = workforce_data.get('leave_stats', {'Pending': 0, 'Approved': 0, 'Rejected': 0})
-        
-        # Prepare charts data
-        dept_labels = [d.department_name for d in departments]
-        dept_counts = [d.employee_count for d in departments]
-        
+        try:
+            # Fetch Admin/HR Company-wide stats
+            stats = attendance_service.get_today_stats()
+            pending_leaves = leave_service.get_pending_count()
+            recent_attendance = attendance_service.get_recent_activity(5)
+            recent_leaves = leave_service.get_recent_requests(5)
+            departments = department_service.get_all_departments()
+            
+            # Trigger dynamic charts generation using Pandas/NumPy/Matplotlib
+            analytics_service.generate_charts()
+            
+            # Load live workforce analytics summary
+            workforce_data = analytics_service.get_workforce_analytics()
+            leave_stats = workforce_data.get('leave_stats', {'Pending': 0, 'Approved': 0, 'Rejected': 0})
+            
+            # Prepare charts data
+            dept_labels = [d.department_name for d in departments]
+            dept_counts = [d.employee_count for d in departments]
+        except Exception as e:
+            from flask import current_app, flash
+            current_app.logger.error(f"Error loading dashboard data: {str(e)}", exc_info=True)
+            flash("Some dashboard metrics failed to load correctly.", "warning")
+            
+            # Safe fallback values
+            stats = {'Present': 0, 'Absent': 0, 'Leave': 0, 'TotalEmployees': 0, 'Unmarked': 0, 'AttendanceRate': 0.0}
+            pending_leaves = 0
+            recent_attendance = []
+            recent_leaves = []
+            dept_labels = []
+            dept_counts = []
+            workforce_data = {
+                "headcount": 0, "avg_salary": 0.0, "median_salary": 0.0, "std_salary": 0.0,
+                "dept_distribution": {},
+                "attendance_stats": {"mean_rate": 0.0, "median_rate": 0.0, "std_rate": 0.0},
+                "leave_stats": {'Pending': 0, 'Approved': 0, 'Rejected': 0}
+            }
+            leave_stats = workforce_data['leave_stats']
+            
         return render_template(
             'dashboard.html',
             stats=stats,
@@ -67,16 +87,25 @@ def index():
                 recent_leaves=[]
             )
             
-        employee = employee_service.get_employee_by_id(emp_id)
-        my_attendance = attendance_service.get_attendance_records(emp_id=emp_id)
-        my_leaves = leave_service.get_leave_requests(emp_id=emp_id)
-        
-        # Calculate personal attendance rate
-        presents = sum(1 for a in my_attendance if a.status == 'Present')
-        absents = sum(1 for a in my_attendance if a.status == 'Absent')
-        total_tracked = presents + absents
-        attendance_rate = round((presents / total_tracked * 100), 1) if total_tracked > 0 else 100.0
-        
+        try:
+            employee = employee_service.get_employee_by_id(emp_id)
+            my_attendance = attendance_service.get_attendance_records(emp_id=emp_id)
+            my_leaves = leave_service.get_leave_requests(emp_id=emp_id)
+            
+            # Calculate personal attendance rate
+            presents = sum(1 for a in my_attendance if a.status == 'Present')
+            absents = sum(1 for a in my_attendance if a.status == 'Absent')
+            total_tracked = presents + absents
+            attendance_rate = round((presents / total_tracked * 100), 1) if total_tracked > 0 else 100.0
+        except Exception as e:
+            from flask import current_app, flash
+            current_app.logger.error(f"Error loading employee dashboard: {str(e)}", exc_info=True)
+            flash("Failed to load your personal dashboard details.", "warning")
+            employee = None
+            my_attendance = []
+            my_leaves = []
+            attendance_rate = 0.0
+            
         return render_template(
             'dashboard.html',
             employee=employee,
@@ -88,8 +117,7 @@ def index():
     return redirect(url_for('auth.login'))
 
 @dashboard_bp.route('/dashboard/audit-logs')
-@login_required
-@role_required(['Admin'])
+@permission_required('can_view_audit_logs')
 def audit_logs():
     page_str = request.args.get('page', '1')
     search_query = request.args.get('search', '').strip()

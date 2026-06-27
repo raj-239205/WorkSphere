@@ -8,9 +8,9 @@
     <div class="card-header-custom">
         <h3 class="card-title-custom">
             <i class="bi bi-calendar-check-fill"></i> 
-            {{ 'Company Attendance Records' if session.get('role') in ['Admin', 'HR'] else 'My Attendance Log' }}
+            {{ 'Company Attendance Records' if has_permission(session.get('role'), 'can_view_attendance') else 'My Attendance Log' }}
         </h3>
-        {% if session.get('role') in ['Admin', 'HR'] %}
+        {% if has_permission(session.get('role'), 'can_manage_attendance') %}
         <a href="{{ url_for('attendance.mark_attendance') }}" class="btn btn-primary">
             <i class="bi bi-check2-circle"></i> Mark Daily Attendance
         </a>
@@ -25,7 +25,7 @@
                 <input type="date" id="date" name="date" class="form-control" value="{{ selected_date or '' }}">
             </div>
             
-            {% if session.get('role') in ['Admin', 'HR'] %}
+            {% if has_permission(session.get('role'), 'can_view_attendance') %}
             <div class="form-group" style="width: 220px;">
                 <label for="department_id" class="form-label">Filter Department</label>
                 <select id="department_id" name="department_id" class="form-control">
@@ -56,13 +56,13 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_view_attendance') %}
                     <th>Employee</th>
                     <th>Department</th>
                     {% endif %}
                     <th>Date</th>
                     <th>Status</th>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_manage_attendance') %}
                     <th style="text-align: right;">Actions</th>
                     {% endif %}
                 </tr>
@@ -70,7 +70,7 @@
             <tbody>
                 {% for record in records %}
                 <tr>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_view_attendance') %}
                     <td style="font-weight: 600;">{{ record.employee_name }}</td>
                     <td>{{ record.department_name or 'Unassigned' }}</td>
                     {% endif %}
@@ -78,7 +78,7 @@
                     <td>
                         <span class="badge badge-{{ record.status|lower }}">{{ record.status }}</span>
                     </td>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_manage_attendance') %}
                     <td style="text-align: right;">
                         <a href="{{ url_for('attendance.edit_attendance', attendance_id=record.attendance_id) }}" class="btn-icon-only" title="Modify Record">
                             <i class="bi bi-pencil"></i>
@@ -88,7 +88,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{{ 5 if session.get('role') in ['Admin', 'HR'] else 2 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                    <td colspan="{{ 5 if has_permission(session.get('role'), 'can_view_attendance') else 2 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
                         No attendance records found for this date.
                     </td>
                 </tr>

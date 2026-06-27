@@ -83,12 +83,22 @@ class LeaveRequest(db.Model):
             
         return errors
 
+    @property
+    def employee_name(self) -> str:
+        """Returns the name of the requesting employee safely."""
+        return self.employee.name if self.employee else None
+
+    @property
+    def department_name(self) -> str:
+        """Returns the name of the employee's department safely."""
+        return self.employee.department.department_name if self.employee and self.employee.department else 'Unassigned'
+
     def to_dict(self) -> dict:
         return {
             'leave_id': self.leave_id,
             'emp_id': self.emp_id,
-            'employee_name': self.employee.name if self.employee else None,
-            'department_name': self.employee.department.department_name if self.employee and self.employee.department else None,
+            'employee_name': self.employee_name,
+            'department_name': self.department_name,
             'reason': self.reason,
             'start_date': self.start_date,
             'end_date': self.end_date,

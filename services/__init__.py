@@ -4,3 +4,4 @@ from services.user_service import UserService
 from services.attendance_service import AttendanceService
 from services.leave_service import LeaveService
 from services.analytics_service import AnalyticsService
+from services.report_service import ReportService

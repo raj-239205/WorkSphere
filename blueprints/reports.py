@@ -1,44 +1,28 @@
-from flask import Blueprint, render_template, request, session, redirect, url_for, send_file
-from blueprints.auth import login_required, role_required
+from flask import Blueprint, render_template, request, send_file
+from utils.security import permission_required
+from services.report_service import ReportService
 from services.department_service import DepartmentService
-from services.attendance_service import AttendanceService
-from services.leave_service import LeaveService
-from services.employee_service import EmployeeService
 from services.analytics_service import AnalyticsService
-from utils.exporters import Exporters
-from collections import defaultdict
 from datetime import datetime, timedelta
 
 reports_bp = Blueprint('reports', __name__)
 
+report_service = ReportService()
 department_service = DepartmentService()
-attendance_service = AttendanceService()
-leave_service = LeaveService()
-employee_service = EmployeeService()
 analytics_service = AnalyticsService()
 
 @reports_bp.route('/reports')
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_view_reports')
 def index():
-    # 1. Department Salaries and Headcount Report using ORM
-    dept_rows = []
-    for dept in department_service.get_all_departments():
-        active_emps = [e for e in dept.employees if e.is_active]
-        headcount = len(active_emps)
-        avg_salary = sum(e.salary for e in active_emps) / headcount if headcount > 0 else 0.0
-        dept_rows.append({
-            'department_name': dept.department_name,
-            'headcount': headcount,
-            'avg_salary': avg_salary
-        })
-        
-    # 2. Leave Summary Data using Analytics Service
+    dept_rows = report_service.get_salaries_report_data()
+            
+    # Leave Summary Data using Analytics Service
     analytics_data = analytics_service.get_workforce_analytics()
     leave_summary = analytics_data.get('leave_stats', {'Pending': 0, 'Approved': 0, 'Rejected': 0})
             
-    # 3. Monthly Attendance Trends (last 6 months)
-    all_attendance = attendance_service.get_attendance_records()
+    # Monthly Attendance Trends (last 6 months)
+    all_attendance = report_service.attendance_service.get_attendance_records()
+    from collections import defaultdict
     monthly_data = defaultdict(lambda: {'Present': 0, 'Absent': 0, 'Leave': 0})
     for record in all_attendance:
         if record.date:
@@ -75,8 +59,7 @@ def index():
     )
 
 @reports_bp.route('/reports/attendance')
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_view_reports')
 def attendance_report():
     start_date = request.args.get('start_date', '').strip()
     end_date = request.args.get('end_date', '').strip()
@@ -89,34 +72,12 @@ def attendance_report():
         start_date = (today - timedelta(days=30)).strftime('%Y-%m-%d')
         
     selected_dept_id = int(dept_id) if dept_id and dept_id.isdigit() else None
-    employees = employee_service.get_all_employees(department_id=selected_dept_id)
+    rows = report_service.get_attendance_report_data(start_date, end_date, selected_dept_id)
     departments = department_service.get_all_departments()
     
-    processed_rows = []
-    for emp in employees:
-        emp_att = [a for a in emp.attendances if start_date <= a.date <= end_date and a.is_active]
-        present_days = sum(1 for a in emp_att if a.status == 'Present')
-        absent_days = sum(1 for a in emp_att if a.status == 'Absent')
-        leave_days = sum(1 for a in emp_att if a.status == 'Leave')
-        total_days = len(emp_att)
-        
-        total_active = present_days + absent_days
-        attendance_rate = round((present_days / total_active * 100), 1) if total_active > 0 else 100.0
-        
-        processed_rows.append({
-            'name': emp.name,
-            'designation': emp.designation,
-            'department_name': emp.department.department_name if emp.department else 'Unassigned',
-            'present_days': present_days,
-            'absent_days': absent_days,
-            'leave_days': leave_days,
-            'total_days': total_days,
-            'attendance_rate': attendance_rate
-        })
-        
     return render_template(
         'reports/attendance.html',
-        rows=processed_rows,
+        rows=rows,
         departments=departments,
         start_date=start_date,
         end_date=end_date,
@@ -124,13 +85,10 @@ def attendance_report():
     )
 
 @reports_bp.route('/reports/export/pdf')
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_view_reports')
 def export_pdf():
     """Generates PDF report of workforce summary."""
-    employees = [e.to_dict() for e in employee_service.get_all_employees()]
-    stats = analytics_service.get_workforce_analytics()
-    pdf_buf = Exporters.generate_pdf_report(employees, stats)
+    pdf_buf = report_service.export_pdf()
     return send_file(
         pdf_buf,
         mimetype='application/pdf',
@@ -139,12 +97,10 @@ def export_pdf():
     )
 
 @reports_bp.route('/reports/export/excel')
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_view_reports')
 def export_excel():
     """Generates Excel directory download of workforce."""
-    employees = [e.to_dict() for e in employee_service.get_all_employees()]
-    excel_buf = Exporters.generate_excel_report(employees)
+    excel_buf = report_service.export_excel()
     return send_file(
         excel_buf,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

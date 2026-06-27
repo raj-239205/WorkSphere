@@ -9,7 +9,7 @@
 {% endblock %}
 
 {% block content %}
-{% if session.get('role') in ['Admin', 'HR'] %}
+{% if has_permission(session.get('role'), 'can_view_analytics') %}
     <!-- Admin & HR Company-wide dashboard -->
     
     <!-- Metrics Grid -->
@@ -309,7 +309,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if session.get('role') in ['Admin', 'HR'] %}
+{% if has_permission(session.get('role'), 'can_view_analytics') %}
 <script>
     // Attendance Rate Chart (Doughnut)
     const ctxAttendance = document.getElementById('attendanceRateChart').getContext('2d');

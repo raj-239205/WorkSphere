@@ -148,6 +148,11 @@ class Employee(User):
             "recent_leaves": my_leaves[:5]
         }
         
+    @property
+    def department_name(self) -> str:
+        """Helper to get department name as a string safely."""
+        return self.department.department_name if self.department else 'Unassigned'
+
     def to_dict(self) -> dict:
         """Serialize employee object to dict."""
         return {
@@ -156,7 +161,7 @@ class Employee(User):
             'email': self.email,
             'phone': self.phone,
             'department_id': self.department_id,
-            'department_name': self.department.department_name if self.department else None,
+            'department_name': self.department_name,
             'salary': self.salary,
             'designation': self.designation,
             'role': self.role,

@@ -17,19 +17,19 @@
             <!-- Full Name -->
             <div class="form-group">
                 <label for="name" class="form-label">Full Name *</label>
-                <input type="text" id="name" name="name" class="form-control" placeholder="Rajveer Choudhary" value="{{ form.get('name', '') }}" required>
+                <input type="text" id="name" name="name" class="form-control" placeholder="e.g. John Doe" value="{{ form.get('name', '') }}" required>
             </div>
             
             <!-- Email -->
             <div class="form-group">
                 <label for="email" class="form-label">Email Address *</label>
-                <input type="email" id="email" name="email" class="form-control" placeholder="john@example.com" value="{{ form.get('email', '') }}" required>
+                <input type="email" id="email" name="email" class="form-control" placeholder="e.g. john.doe@example.com" value="{{ form.get('email', '') }}" required>
             </div>
             
             <!-- Phone -->
             <div class="form-group">
                 <label for="phone" class="form-label">Phone Number</label>
-                <input type="text" id="phone" name="phone" class="form-control" placeholder="1234567890" value="{{ form.get('phone', '') }}">
+                <input type="text" id="phone" name="phone" class="form-control" placeholder="e.g. +1 (555) 019-2834" value="{{ form.get('phone', '') }}">
             </div>
             
             <!-- Department -->
@@ -48,13 +48,13 @@
             <!-- Designation -->
             <div class="form-group">
                 <label for="designation" class="form-label">Designation</label>
-                <input type="text" id="designation" name="designation" class="form-control" placeholder="Software Engineer" value="{{ form.get('designation', '') }}">
+                <input type="text" id="designation" name="designation" class="form-control" placeholder="e.g. Software Engineer" value="{{ form.get('designation', '') }}">
             </div>
             
             <!-- Salary -->
             <div class="form-group">
                 <label for="salary" class="form-label">Base Salary ($) *</label>
-                <input type="number" step="0.01" id="salary" name="salary" class="form-control" placeholder="50000.00" value="{{ form.get('salary', '0.00') }}" required>
+                <input type="number" step="0.01" id="salary" name="salary" class="form-control" placeholder="e.g. 50000.00" value="{{ form.get('salary', '') }}" required>
             </div>
         </div>
         

@@ -5,6 +5,7 @@ from exceptions.custom_exceptions import DepartmentNotFoundException
 from models.department import Department
 from models.activity_log import ActivityLog
 from database.db_manager import DatabaseManager
+from utils.security import check_permission
 from typing import List, Optional
 import json
 
@@ -17,16 +18,20 @@ class DepartmentService(BaseService):
         self.db_manager = DatabaseManager()
 
     def get_all_departments(self, include_inactive: bool = False) -> List[Department]:
+        check_permission('can_view_departments', "View Departments List")
         return self.department_repo.get_all(include_inactive)
 
     def get_department_by_id(self, department_id: int) -> Optional[Department]:
+        check_permission('can_view_departments', f"View Department ID {department_id}")
         return self.department_repo.get_by_id(department_id)
 
     def get_department_by_name(self, name: str) -> Optional[Department]:
+        check_permission('can_view_departments', f"View Department by Name {name}")
         return self.department_repo.get_by_name(name)
 
     def create_department(self, department_name: str, manager_name: str) -> Department:
         """Creates a new Department. Enforces department name uniqueness."""
+        check_permission('can_add_department', "Create Department Attempt")
         with self.db_manager.session_scope():
             existing = self.department_repo.get_by_name(department_name)
             if existing:
@@ -46,6 +51,7 @@ class DepartmentService(BaseService):
 
     def update_department(self, department_id: int, department_name: str, manager_name: str) -> None:
         """Updates department details. Enforces name uniqueness excluding itself."""
+        check_permission('can_edit_department', f"Update Department ID {department_id} Attempt")
         with self.db_manager.session_scope():
             dept = self.department_repo.get_by_id(department_id)
             if not dept:
@@ -73,6 +79,7 @@ class DepartmentService(BaseService):
 
     def delete_department(self, department_id: int) -> None:
         """Soft-deletes department if it has no active employees."""
+        check_permission('can_delete_department', f"Delete Department ID {department_id} Attempt")
         with self.db_manager.session_scope():
             dept = self.department_repo.get_by_id(department_id)
             if not dept:
@@ -96,6 +103,7 @@ class DepartmentService(BaseService):
 
     def restore_department(self, department_id: int) -> None:
         """Restores soft-deleted department."""
+        check_permission('can_delete_department', f"Restore Department ID {department_id} Attempt")
         with self.db_manager.session_scope():
             dept = self.department_repo.get_by_id(department_id)
             if not dept:

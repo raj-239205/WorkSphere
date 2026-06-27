@@ -92,3 +92,69 @@ def test_overlapping_leaves(session):
             start_date=overlapping_start,
             end_date=overlapping_end
         )
+
+def test_model_properties_and_fallback(session):
+    from models.department import Department
+    from models.user import Employee
+    from models.attendance import Attendance
+    from services.analytics_service import AnalyticsService
+    
+    # 1. Department employee count
+    dept = Department.query.filter_by(department_name="Software Engineering").first()
+    assert dept is not None
+    assert dept.employee_count >= 1
+    
+    # 2. Employee department name
+    emp = Employee.query.filter_by(email="rajveer@worksphere.com").first()
+    assert emp is not None
+    assert emp.department_name == "Software Engineering"
+    
+    # 3. Attendance properties
+    att = Attendance(emp_id=emp.user_id, date="2026-06-19", status="Present")
+    session.add(att)
+    session.commit()
+    
+    assert att.employee_name == "Rajveer Choudhary"
+    assert att.department_name == "Software Engineering"
+    
+    # 4. LeaveRequest properties
+    leave = Leave(emp_id=emp.user_id, reason="Vacation", start_date="2026-07-01", end_date="2026-07-05")
+    session.add(leave)
+    session.commit()
+    
+    assert leave.employee_name == "Rajveer Choudhary"
+    assert leave.department_name == "Software Engineering"
+
+def test_analytics_service_empty_db_and_error(app):
+    from database.db_manager import db
+    from services.analytics_service import AnalyticsService
+    from unittest.mock import patch
+    
+    analytics_service = AnalyticsService()
+    
+    # Run in a clean app context with totally empty database
+    with app.app_context():
+        # Drop all tables to guarantee empty database state
+        db.drop_all()
+        db.create_all()
+        
+        # Test empty database behavior
+        stats = analytics_service.get_workforce_analytics()
+        assert stats["headcount"] == 0
+        assert stats["avg_salary"] == 0.0
+        assert stats["attendance_stats"]["mean_rate"] == 0.0
+        assert stats["leave_stats"]["Pending"] == 0
+        
+        # Test generate_charts returns empty dictionary or doesn't crash
+        charts = analytics_service.generate_charts()
+        assert isinstance(charts, dict)
+        
+        # Force an exception (e.g. mock DB session query to throw error)
+        with patch('database.db_manager.db.session.query') as mock_query:
+            mock_query.side_effect = Exception("Database error simulation")
+            err_stats = analytics_service.get_workforce_analytics()
+            assert err_stats["headcount"] == 0
+            assert err_stats["avg_salary"] == 0.0
+            
+            err_charts = analytics_service.generate_charts()
+            assert err_charts == {}

@@ -7,7 +7,7 @@
 <div class="glass-card">
     <div class="card-header-custom">
         <h3 class="card-title-custom"><i class="bi bi-airplane-fill"></i> Leave Registry</h3>
-        {% if session.get('role') == 'Employee' %}
+        {% if has_permission(session.get('role'), 'can_view_own_leaves') %}
         <a href="{{ url_for('leave.apply_leave') }}" class="btn btn-primary">
             <i class="bi bi-calendar-plus"></i> Apply for Leave
         </a>
@@ -37,7 +37,7 @@
         <table class="custom-table">
             <thead>
                 <tr>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_view_leaves') %}
                     <th>Employee</th>
                     <th>Department</th>
                     {% endif %}
@@ -45,7 +45,7 @@
                     <th>Start Date</th>
                     <th>End Date</th>
                     <th>Status</th>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_approve_leave') %}
                     <th style="text-align: right; width: 200px;">Actions</th>
                     {% endif %}
                 </tr>
@@ -53,7 +53,7 @@
             <tbody>
                 {% for req in requests %}
                 <tr>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_view_leaves') %}
                     <td style="font-weight: 600;">{{ req.employee_name }}</td>
                     <td>{{ req.department_name or 'Unassigned' }}</td>
                     {% endif %}
@@ -65,7 +65,7 @@
                     <td>
                         <span class="badge badge-{{ req.status|lower }}">{{ req.status }}</span>
                     </td>
-                    {% if session.get('role') in ['Admin', 'HR'] %}
+                    {% if has_permission(session.get('role'), 'can_approve_leave') %}
                     <td>
                         <div style="display: flex; gap: 8px; justify-content: flex-end;">
                             {% if req.status == 'Pending' %}
@@ -92,7 +92,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="{{ 7 if session.get('role') in ['Admin', 'HR'] else 4 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                    <td colspan="{{ 7 if has_permission(session.get('role'), 'can_view_leaves') else 4 }}" style="text-align: center; color: var(--text-muted); padding: 32px;">
                         No leave requests found.
                     </td>
                 </tr>

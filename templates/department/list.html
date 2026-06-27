@@ -7,9 +7,11 @@
 <div class="glass-card">
     <div class="card-header-custom">
         <h3 class="card-title-custom"><i class="bi bi-building-fill"></i> Department Directory</h3>
+        {% if has_permission(session.get('role'), 'can_add_department') %}
         <a href="{{ url_for('department.add_department') }}" class="btn btn-primary">
             <i class="bi bi-plus-square"></i> Add Department
         </a>
+        {% endif %}
     </div>
     
     <!-- Table View -->
@@ -20,7 +22,9 @@
                     <th>Department Name</th>
                     <th>Manager Name</th>
                     <th>Employee Headcount</th>
+                    {% if has_permission(session.get('role'), 'can_edit_department') or has_permission(session.get('role'), 'can_delete_department') %}
                     <th style="text-align: right; width: 160px;">Actions</th>
+                    {% endif %}
                 </tr>
             </thead>
             <tbody>
@@ -33,18 +37,24 @@
                             {{ dept.employee_count }} Members
                         </span>
                     </td>
+                    {% if has_permission(session.get('role'), 'can_edit_department') or has_permission(session.get('role'), 'can_delete_department') %}
                     <td>
                         <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center;">
+                            {% if has_permission(session.get('role'), 'can_edit_department') %}
                             <a href="{{ url_for('department.edit_department', department_id=dept.department_id) }}" class="btn-icon-only" title="Edit Department">
                                 <i class="bi bi-pencil"></i>
                             </a>
+                            {% endif %}
+                            {% if has_permission(session.get('role'), 'can_delete_department') %}
                             <form action="{{ url_for('department.delete_department', department_id=dept.department_id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete department \'{{ dept.department_name }}\'?');">
                                 <button type="submit" class="btn-icon-only btn-icon-delete" title="Delete Department">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </form>
+                            {% endif %}
                         </div>
                     </td>
+                    {% endif %}
                 </tr>
                 {% else %}
                 <tr>

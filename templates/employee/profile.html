@@ -1,23 +1,23 @@
 {% extends 'base.html' %}
 
 {% block title %}Employee Profile - WorkSphere{% endblock %}
-{% block page_title %}Employee Profile{% endblock %}
+{% block page_title %}{{ employee.name }}'s Profile{% endblock %}
 
 {% block content %}
 <div class="glass-card" style="max-width: 800px; margin: 0 auto;">
-    <!-- Profile Header -->
-    <div class="profile-header">
-        <div class="profile-avatar">
+    <div class="card-header-custom" style="display: flex; align-items: center; gap: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 20px;">
+        <div class="profile-avatar" style="width: 80px; height: 80px; font-size: 2.2rem;">
             {{ employee.name[0]|upper }}
         </div>
-        <div class="profile-title">
-            <h1>{{ employee.name }}</h1>
-            <p>{{ employee.designation or 'No Designation' }} &bull; {{ employee.department_name or 'Unassigned Department' }}</p>
+        <div>
+            <h2 style="font-family: 'Outfit', sans-serif; font-size: 1.8rem; font-weight: 700; margin-bottom: 4px;">{{ employee.name }}</h2>
+            <span class="badge" style="background-color: var(--primary-glow); color: var(--primary); font-size: 0.9rem; font-weight: bold; padding: 6px 12px;">
+                {{ employee.role }} Account
+            </span>
         </div>
     </div>
     
-    <!-- Profile Grid details -->
-    <div class="profile-grid" style="margin-bottom: 32px;">
+    <div class="info-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; margin-top: 24px; margin-bottom: 32px;">
         <div class="info-item">
             <span class="info-label">Full Name</span>
             <span class="info-value">{{ employee.name }}</span>
@@ -43,7 +43,7 @@
             <span class="info-value">{{ employee.designation or 'N/A' }}</span>
         </div>
         
-        {% if session.get('role') in ['Admin', 'HR'] %}
+        {% if has_permission(session.get('role'), 'can_view_employees') %}
         <div class="info-item">
             <span class="info-label">Annual Base Salary</span>
             <span class="info-value" style="font-family: monospace; font-weight: bold; color: var(--success);">${{ employee.salary }}</span>
@@ -51,11 +51,14 @@
         {% endif %}
     </div>
     
-    <div class="form-actions" style="justify-content: flex-start;">
-        {% if session.get('role') in ['Admin', 'HR'] %}
+    <div class="form-actions" style="justify-content: flex-start; gap: 12px;">
+        {% if has_permission(session.get('role'), 'can_edit_employee') %}
             <a href="{{ url_for('employee.edit_employee', emp_id=employee.emp_id) }}" class="btn btn-primary">
                 <i class="bi bi-pencil"></i> Edit Details
             </a>
+        {% endif %}
+        
+        {% if has_permission(session.get('role'), 'can_view_employees') %}
             <a href="{{ url_for('employee.list_employees') }}" class="btn btn-secondary">
                 <i class="bi bi-arrow-left"></i> Back to Directory
             </a>

@@ -2,10 +2,12 @@ from services.base_service import BaseService
 from repositories.attendance_repository import AttendanceRepository
 from repositories.employee_repository import EmployeeRepository
 from repositories.activity_log_repository import ActivityLogRepository
-from exceptions.custom_exceptions import AttendanceValidationException
+from exceptions.custom_exceptions import AttendanceValidationException, UnauthorizedAccessException
 from models.attendance import Attendance
 from models.activity_log import ActivityLog
 from database.db_manager import DatabaseManager
+from utils.security import check_permission, get_current_user_details, has_permission, log_auth_event
+from flask import has_request_context, request
 from datetime import datetime
 from typing import List, Optional
 import json
@@ -26,6 +28,22 @@ class AttendanceService(BaseService):
         from database.db_manager import db
         from models.user import Employee
         
+        user_details = get_current_user_details()
+        if user_details:
+            role = user_details.get('role')
+            user_id = user_details.get('user_id')
+            if not has_permission(role, 'can_view_attendance'):
+                if has_permission(role, 'can_view_own_attendance') and (emp_id is None or int(emp_id) == int(user_id)):
+                    # Restrict to own user ID
+                    emp_id = user_id
+                else:
+                    log_auth_event(
+                        user_id, user_details.get('username'), role, 
+                        'can_view_attendance', "View Attendance List", 'Denied', 
+                        request.remote_addr if has_request_context() else '127.0.0.1'
+                    )
+                    raise UnauthorizedAccessException("You do not have permission to view other employee attendance records.")
+
         query = db.session.query(Attendance).join(Employee, Attendance.emp_id == Employee.user_id)
         query = query.filter(Attendance.is_active == True, Employee.is_active == True)
         
@@ -39,10 +57,27 @@ class AttendanceService(BaseService):
         return query.order_by(Attendance.date.desc(), Employee.name.asc()).all()
 
     def get_attendance_by_id(self, attendance_id: int) -> Optional[Attendance]:
-        return self.attendance_repo.get_by_id(attendance_id)
+        record = self.attendance_repo.get_by_id(attendance_id)
+        if record:
+            user_details = get_current_user_details()
+            if user_details:
+                role = user_details.get('role')
+                user_id = user_details.get('user_id')
+                if not has_permission(role, 'can_view_attendance'):
+                    if has_permission(role, 'can_view_own_attendance') and int(record.emp_id) == int(user_id):
+                        pass
+                    else:
+                        log_auth_event(
+                            user_id, user_details.get('username'), role, 
+                            'can_view_attendance', f"View Attendance record ID {attendance_id}", 'Denied', 
+                            request.remote_addr if has_request_context() else '127.0.0.1'
+                        )
+                        raise UnauthorizedAccessException("You do not have permission to access this attendance record.")
+        return record
 
     def mark_attendance(self, emp_id: int, date: str, status: str) -> int:
         """Marks attendance for an employee on a given date (with upsert behavior)."""
+        check_permission('can_manage_attendance', f"Mark Attendance for Employee ID {emp_id}")
         if status not in ['Present', 'Absent', 'Leave']:
             raise AttendanceValidationException("Status must be 'Present', 'Absent', or 'Leave'")
             
@@ -81,6 +116,7 @@ class AttendanceService(BaseService):
                 return created.attendance_id
 
     def update_attendance(self, attendance_id: int, status: str) -> None:
+        check_permission('can_manage_attendance', f"Update Attendance ID {attendance_id}")
         if status not in ['Present', 'Absent', 'Leave']:
             raise AttendanceValidationException("Status must be 'Present', 'Absent', or 'Leave'")
             
@@ -103,6 +139,7 @@ class AttendanceService(BaseService):
             self.activity_log_repo.create(log)
 
     def delete_attendance(self, attendance_id: int) -> None:
+        check_permission('can_manage_attendance', f"Delete Attendance ID {attendance_id}")
         with self.db_manager.session_scope():
             record = self.attendance_repo.get_by_id(attendance_id)
             if not record:
@@ -121,6 +158,7 @@ class AttendanceService(BaseService):
 
     def get_today_stats(self) -> dict:
         """Returns statistical counts and rate for today's attendance."""
+        check_permission('can_view_attendance', "Get Today's Attendance Stats")
         today = datetime.now().strftime('%Y-%m-%d')
         active_employees = self.employee_repo.get_all(include_inactive=False)
         total_employees = len(active_employees)
@@ -138,11 +176,12 @@ class AttendanceService(BaseService):
         stats['Unmarked'] = unmarked
         
         present = stats['Present']
-        absent = stats['Absent'] + unmarked
-        total_active_for_attendance = present + absent
+        absent = stats['Absent']
+        total_marked = present + absent
         
-        stats['AttendanceRate'] = round((present / total_active_for_attendance * 100), 1) if total_active_for_attendance > 0 else 0.0
+        stats['AttendanceRate'] = round((present / total_marked * 100), 1) if total_marked > 0 else 100.0
         return stats
 
     def get_recent_activity(self, limit: int = 5) -> List[Attendance]:
+        check_permission('can_view_attendance', "Get Recent Attendance Activity")
         return self.attendance_repo.get_recent(limit)

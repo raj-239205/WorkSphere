@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session, abort
-from blueprints.auth import login_required, role_required
+from utils.security import permission_required, has_permission
 from services.leave_service import LeaveService
 from services.employee_service import EmployeeService
 from models.leave import LeaveRequest as Leave
@@ -10,16 +10,16 @@ employee_service = EmployeeService()
 
 @leave_bp.route('/leaves')
 @leave_bp.route('/leave/requests')
-@login_required
+@permission_required('can_view_own_leaves')
 def list_leaves():
     role = session.get('role')
-    emp_id = session.get('emp_id')
+    emp_id = session.get('user_id')
     status_filter = request.args.get('status', '').strip()
     
-    if role in ['Admin', 'HR']:
+    if has_permission(role, 'can_view_leaves'):
         requests = leave_service.get_leave_requests(status=status_filter if status_filter else None)
         return render_template('leave/requests.html', requests=requests, selected_status=status_filter)
-    elif role == 'Employee':
+    else:
         if not emp_id:
             flash("Employee profile not linked.", "warning")
             return redirect(url_for('dashboard.index'))
@@ -29,23 +29,21 @@ def list_leaves():
             emp_id=emp_id
         )
         return render_template('leave/requests.html', requests=requests, selected_status=status_filter)
-        
-    return redirect(url_for('auth.login'))
 
 @leave_bp.route('/leave/apply', methods=['GET', 'POST'])
-@login_required
+@permission_required('can_view_own_leaves')
 def apply_leave():
     from datetime import date
     role = session.get('role')
-    emp_id = session.get('emp_id')
+    emp_id = session.get('user_id')
     today_str = date.today().strftime('%Y-%m-%d')
     
     employees = []
-    if role in ['Admin', 'HR']:
+    if has_permission(role, 'can_approve_leave'):
         employees = employee_service.get_all_employees()
         
     if request.method == 'POST':
-        if role in ['Admin', 'HR']:
+        if has_permission(role, 'can_approve_leave'):
             target_emp_id = request.form.get('emp_id')
             target_emp_id = int(target_emp_id) if target_emp_id and target_emp_id.isdigit() else None
         else:
@@ -74,8 +72,7 @@ def apply_leave():
     return render_template('leave/apply.html', employees=employees, form={}, today_str=today_str)
 
 @leave_bp.route('/leave/approve/<int:leave_id>', methods=['POST'])
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_approve_leave')
 def approve_leave(leave_id):
     leave = leave_service.get_leave_by_id(leave_id)
     if not leave:
@@ -83,15 +80,14 @@ def approve_leave(leave_id):
         
     try:
         leave_service.update_leave_status(leave_id, 'Approved')
-        flash(f"Leave request for {leave.employee.name if leave.employee else 'Employee'} approved. Attendance updated.", "success")
+        flash(f"Leave request approved. Attendance updated.", "success")
     except Exception as e:
         flash(f"Failed to approve: {e}", "danger")
         
     return redirect(url_for('leave.list_leaves'))
 
 @leave_bp.route('/leave/reject/<int:leave_id>', methods=['POST'])
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_approve_leave')
 def reject_leave(leave_id):
     leave = leave_service.get_leave_by_id(leave_id)
     if not leave:
@@ -99,15 +95,14 @@ def reject_leave(leave_id):
         
     try:
         leave_service.update_leave_status(leave_id, 'Rejected')
-        flash(f"Leave request for {leave.employee.name if leave.employee else 'Employee'} rejected.", "success")
+        flash(f"Leave request rejected.", "success")
     except Exception as e:
         flash(f"Failed to reject: {e}", "danger")
         
     return redirect(url_for('leave.list_leaves'))
 
 @leave_bp.route('/leave/delete/<int:leave_id>', methods=['POST'])
-@login_required
-@role_required(['Admin', 'HR'])
+@permission_required('can_approve_leave')
 def delete_leave(leave_id):
     leave = leave_service.get_leave_by_id(leave_id)
     if not leave:

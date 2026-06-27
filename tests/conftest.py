@@ -41,7 +41,7 @@ def session(app):
         # Seed HR profile
         hr_emp = employee_service.create_employee(
             name="Sudhanshu Sharma",
-            email="sudhanshu@worksphere.com",
+            email="hr@worksphere.com",
             phone="9876543210",
             department_id=hr_dept.department_id,
             salary=95000.0,
