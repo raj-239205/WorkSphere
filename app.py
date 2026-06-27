@@ -1,5 +1,6 @@
 import os
-from flask import Flask, render_template, redirect, url_for, session, request
+from datetime import datetime
+from flask import Flask, render_template, redirect, url_for, session, request, jsonify
 from database.db_manager import db
 from extensions import jwt, limiter
 from flask_migrate import Migrate
@@ -56,6 +57,25 @@ def create_app(config_class=None):
         if 'user_id' in session:
             return redirect(url_for('dashboard.index'))
         return redirect(url_for('auth.login'))
+        
+    @app.route('/health')
+    def health():
+        """System health check endpoint verifying database connectivity."""
+        try:
+            from sqlalchemy import text
+            db.session.execute(text('SELECT 1'))
+            return jsonify({
+                "status": "healthy",
+                "database": "connected",
+                "timestamp": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+            }), 200
+        except Exception as e:
+            app.logger.error(f"Health check failed: {str(e)}")
+            return jsonify({
+                "status": "unhealthy",
+                "database": "disconnected",
+                "error": str(e)
+            }), 500
         
     # Context Processor for active navigation states & RBAC
     @app.context_processor
