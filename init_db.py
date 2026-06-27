@@ -49,6 +49,7 @@ def create_default_hr(hr_dept_id):
         return employee_service.get_employee_by_email("hr@worksphere.com")
 
 def seed_data():
+    db.create_all()
     print("Seeding database using SQLAlchemy ORM...")
     
     # 1. Seed Departments

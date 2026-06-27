@@ -3,7 +3,6 @@ import os
 
 def setup_logger(app):
     """Configure logging for local development and Vercel."""
-
     log_format = logging.Formatter(
         "[%(asctime)s] %(levelname)s in %(module)s: %(message)s"
     )

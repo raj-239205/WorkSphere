@@ -1,9 +1,8 @@
 import threading
 import json
-import sqlite3
 from datetime import datetime
 from functools import wraps
-from flask import has_request_context, request, session, render_template, jsonify
+from flask import has_request_context, request, session, render_template, jsonify, redirect
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from config import BaseConfig
 import os
@@ -94,10 +93,11 @@ def get_current_user_details():
     return None
 
 def log_auth_event(user_id, username, role, permission, action, result, ip_address):
-    """Logs the authorization event directly to the SQLite activity_logs table."""
+    """Logs the authorization event using an independent SQLAlchemy session to remain database-agnostic."""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        cursor = conn.cursor()
+        from database.db_manager import db
+        from models.activity_log import ActivityLog
+        from sqlalchemy.orm import sessionmaker
         
         log_details = {
             "permission_checked": permission,
@@ -107,12 +107,25 @@ def log_auth_event(user_id, username, role, permission, action, result, ip_addre
             "result": result
         }
         
-        cursor.execute(
-            "INSERT INTO activity_logs (user_id, action_type, timestamp, ip_address, old_value, new_value) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, action, datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S'), ip_address, None, json.dumps(log_details))
-        )
-        conn.commit()
-        conn.close()
+        # Create an independent session utilizing the app's engine
+        # This keeps the logging operation decoupled from any pending/failed transaction in the main thread session.
+        Session = sessionmaker(bind=db.engine)
+        session = Session()
+        try:
+            log_entry = ActivityLog(
+                user_id=user_id,
+                action_type=action,
+                ip_address=ip_address,
+                new_value=json.dumps(log_details)
+            )
+            log_entry.timestamp = datetime.utcnow()
+            session.add(log_entry)
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
     except Exception as e:
         print(f"Audit log write failed: {e}")
 

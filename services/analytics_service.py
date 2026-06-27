@@ -19,7 +19,8 @@ class AnalyticsService(BaseService):
 
     def __init__(self):
         self.charts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'charts')
-        os.makedirs(self.charts_dir, exist_ok=True)
+        if not os.environ.get("VERCEL"):
+            os.makedirs(self.charts_dir, exist_ok=True)
 
     def get_workforce_analytics(self) -> dict:
         """Computes statistical metrics on salaries, departments, attendance, and leaves using Pandas/NumPy."""
@@ -125,6 +126,16 @@ class AnalyticsService(BaseService):
         """Generates and saves dynamic Matplotlib PNG charts to static/charts/."""
         from utils.security import check_permission
         check_permission('can_view_analytics', "Generate Analytics Charts")
+        
+        # On Vercel, the filesystem is read-only, so we bypass actual file generation
+        if os.environ.get("VERCEL"):
+            return {
+                'department_headcount': '/static/charts/department_headcount.png',
+                'leave_distribution': '/static/charts/leave_distribution.png',
+                'attendance_trends': '/static/charts/attendance_trends.png',
+                'attendance_heatmap': '/static/charts/attendance_heatmap.png'
+            }
+            
         try:
             # 1. Retrieve Data
             analytics_data = self.get_workforce_analytics()
